@@ -277,6 +277,14 @@ export class FieldDropdown extends Field<string> {
     const menuElement = this.menu_!.render(dropDownDiv.getContentDiv());
     dom.addClass(menuElement, 'blocklyDropdownMenu');
 
+    //Add our color to the dropdown
+    if (this.menu_) {
+      this.menu_.getMenuItems().forEach((item) => {
+        const menuItem = item.getElement();
+        if (menuItem && this.textElement_) menuItem.children[0].setAttribute("style", `color: ${this.textElement_.style.fill}`);
+      })
+    }
+
     if (this.getConstants()!.FIELD_DROPDOWN_COLOURED_DIV) {
       const primaryColour = block.getColour();
       const borderColour = (this.sourceBlock_ as BlockSvg).style.colourTertiary;
@@ -466,6 +474,8 @@ export class FieldDropdown extends Field<string> {
         this.arrow.style.fill = style.colourPrimary;
       }
     }
+
+    super.applyColour();
   }
 
   /** Draws the border with the correct width. */

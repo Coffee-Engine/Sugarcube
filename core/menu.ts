@@ -241,6 +241,11 @@ export class Menu {
     return null;
   }
 
+  //Get all of our menu items
+  getMenuItems(): MenuItem[] {
+    return this.menuItems.filter((item) => (item as MenuItem));
+  }
+
   // Highlight management.
 
   /**

@@ -1177,6 +1177,13 @@ export class BlockSvg
       throw Error('Invalid style name: ' + blockStyleName);
     }
   }
+  
+  getStyle() {
+    return this.workspace
+      .getRenderer()
+      .getConstants()
+      .getBlockStyle(this.styleName_);
+  }
 
   /**
    * Move this block to the front of the visible workspace.
