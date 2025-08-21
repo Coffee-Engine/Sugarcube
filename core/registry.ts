@@ -8,29 +8,22 @@
 
 import type {Abstract} from './events/events_abstract.js';
 import type {Field} from './field.js';
-import type {Input} from './inputs/input.js';
+import type {IBlockDragger} from './interfaces/i_block_dragger.js';
 import type {IConnectionChecker} from './interfaces/i_connection_checker.js';
-import type {IConnectionPreviewer} from './interfaces/i_connection_previewer.js';
-import type {ICopyData, ICopyable} from './interfaces/i_copyable.js';
-import type {IDragger} from './interfaces/i_dragger.js';
 import type {IFlyout} from './interfaces/i_flyout.js';
-import type {IFlyoutInflater} from './interfaces/i_flyout_inflater.js';
-import type {IIcon} from './interfaces/i_icon.js';
 import type {IMetricsManager} from './interfaces/i_metrics_manager.js';
-import type {IPaster} from './interfaces/i_paster.js';
+import type {IIcon} from './interfaces/i_icon.js';
+import type {Input} from './inputs/input.js';
 import type {ISerializer} from './interfaces/i_serializer.js';
 import type {IToolbox} from './interfaces/i_toolbox.js';
-import type {IVariableMap} from './interfaces/i_variable_map.js';
-import type {
-  IVariableModel,
-  IVariableModelStatic,
-  IVariableState,
-} from './interfaces/i_variable_model.js';
-import type {LineCursor} from './keyboard_nav/line_cursor.js';
+import type {Cursor} from './keyboard_nav/cursor.js';
 import type {Options} from './options.js';
 import type {Renderer} from './renderers/common/renderer.js';
 import type {Theme} from './theme.js';
 import type {ToolboxItem} from './toolbox/toolbox_item.js';
+import type {IPaster} from './interfaces/i_paster.js';
+import type {ICopyData, ICopyable} from './interfaces/i_copyable.js';
+import type {IConnectionPreviewer} from './interfaces/i_connection_previewer.js';
 
 /**
  * A map of maps. With the keys being the type and name of the class we are
@@ -78,7 +71,7 @@ export class Type<_T> {
     'connectionPreviewer',
   );
 
-  static CURSOR = new Type<LineCursor>('cursor');
+  static CURSOR = new Type<Cursor>('cursor');
 
   static EVENT = new Type<Abstract>('event');
 
@@ -100,15 +93,9 @@ export class Type<_T> {
     'flyoutsHorizontalToolbox',
   );
 
-  static FLYOUT_INFLATER = new Type<IFlyoutInflater>('flyoutInflater');
-
   static METRICS_MANAGER = new Type<IMetricsManager>('metricsManager');
 
-  /**
-   * Type for an IDragger. Formerly behavior was mostly covered by
-   * BlockDraggeers, which is why the name is inaccurate.
-   */
-  static BLOCK_DRAGGER = new Type<IDragger>('blockDragger');
+  static BLOCK_DRAGGER = new Type<IBlockDragger>('blockDragger');
 
   /** @internal */
   static SERIALIZER = new Type<ISerializer>('serializer');
@@ -118,14 +105,6 @@ export class Type<_T> {
 
   /** @internal */
   static PASTER = new Type<IPaster<ICopyData, ICopyable<ICopyData>>>('paster');
-
-  static VARIABLE_MODEL = new Type<IVariableModelStatic<IVariableState>>(
-    'variableModel',
-  );
-
-  static VARIABLE_MAP = new Type<IVariableMap<IVariableModel<IVariableState>>>(
-    'variableMap',
-  );
 }
 
 /**
@@ -183,13 +162,8 @@ export function register<T>(
   // Validate that the given class has all the required properties.
   validate(type, registryItem);
 
-  // Don't throw an error if opt_allowOverrides is true,
-  // or if we're trying to register the same item.
-  if (
-    !opt_allowOverrides &&
-    typeRegistry[caselessName] &&
-    typeRegistry[caselessName] !== registryItem
-  ) {
+  // Don't throw an error if opt_allowOverrides is true.
+  if (!opt_allowOverrides && typeRegistry[caselessName]) {
     throw Error(
       'Name "' +
         caselessName +
@@ -210,7 +184,7 @@ export function register<T>(
  * @param registryItem A class or object that we are checking for the required
  *     properties.
  */
-function validate(type: string, registryItem: AnyDuringMigration) {
+function validate(type: string, registryItem: Function | AnyDuringMigration) {
   switch (type) {
     case String(Type.FIELD):
       if (typeof registryItem.fromJson !== 'function') {

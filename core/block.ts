@@ -23,43 +23,40 @@ import * as common from './common.js';
 import {Connection} from './connection.js';
 import {ConnectionType} from './connection_type.js';
 import * as constants from './constants.js';
+import {DuplicateIconType} from './icons/exceptions.js';
 import type {Abstract} from './events/events_abstract.js';
-import type {BlockChange} from './events/events_block_change.js';
 import type {BlockMove} from './events/events_block_move.js';
-import {EventType} from './events/type.js';
 import * as eventUtils from './events/utils.js';
 import * as Extensions from './extensions.js';
 import type {Field} from './field.js';
 import * as fieldRegistry from './field_registry.js';
-import {DuplicateIconType} from './icons/exceptions.js';
-import {IconType} from './icons/icon_types.js';
-import type {MutatorIcon} from './icons/mutator_icon.js';
-import {Align} from './inputs/align.js';
-import {DummyInput} from './inputs/dummy_input.js';
-import {EndRowInput} from './inputs/end_row_input.js';
 import {Input} from './inputs/input.js';
-import {StatementInput} from './inputs/statement_input.js';
-import {ValueInput} from './inputs/value_input.js';
-import {isCommentIcon} from './interfaces/i_comment_icon.js';
-import {type IIcon} from './interfaces/i_icon.js';
-import type {
-  IVariableModel,
-  IVariableState,
-} from './interfaces/i_variable_model.js';
-import * as registry from './registry.js';
+import {Align} from './inputs/align.js';
+import type {IASTNodeLocation} from './interfaces/i_ast_node_location.js';
+import type {IDeletable} from './interfaces/i_deletable.js';
+import type {IIcon} from './interfaces/i_icon.js';
+import {CommentIcon} from './icons/comment_icon.js';
+import type {MutatorIcon} from './icons/mutator_icon.js';
 import * as Tooltip from './tooltip.js';
 import * as arrayUtils from './utils/array.js';
 import {Coordinate} from './utils/coordinate.js';
 import * as idGenerator from './utils/idgenerator.js';
 import * as parsing from './utils/parsing.js';
+import * as registry from './registry.js';
 import {Size} from './utils/size.js';
+import type {VariableModel} from './variable_model.js';
 import type {Workspace} from './workspace.js';
+import {DummyInput} from './inputs/dummy_input.js';
+import {EndRowInput} from './inputs/end_row_input.js';
+import {ValueInput} from './inputs/value_input.js';
+import {StatementInput} from './inputs/statement_input.js';
+import {IconType} from './icons/icon_types.js';
 
 /**
  * Class for one block.
  * Not normally called directly, workspace.newBlock() is preferred.
  */
-export class Block {
+export class Block implements IASTNodeLocation, IDeletable {
   /**
    * An optional callback method to use whenever the block's parent workspace
    * changes. This is usually only called from the constructor, the block type
@@ -90,7 +87,7 @@ export class Block {
    * Colour of the block as HSV hue value (0-360)
    * This may be null if the block colour was not set via a hue number.
    */
-  private hue: number | null = null;
+  private hue_: number | null = null;
 
   /** Colour of the block in '#RRGGBB' format. */
   protected colour_ = '#000000';
@@ -145,31 +142,24 @@ export class Block {
   suppressPrefixSuffix: boolean | null = false;
 
   /**
-   * An optional method for declaring developer variables, to be used
-   * by generators.  Developer variables are never shown to the user,
-   * but are declared as global variables in the generated code.
-   *
-   * @returns a list of developer variable names.
+   * An optional property for declaring developer variables.  Return a list of
+   * variable names for use by generators.  Developer variables are never
+   * shown to the user, but are declared as global variables in the generated
+   * code.
    */
   getDeveloperVariables?: () => string[];
 
   /**
-   * An optional method that reconfigures the block based on the
-   * contents of the mutator dialog.
-   *
-   * @param rootBlock The root block in the mutator flyout.
+   * An optional function that reconfigures the block based on the contents of
+   * the mutator dialog.
    */
-  compose?: (rootBlock: Block) => void;
+  compose?: (p1: Block) => void;
 
   /**
-   * An optional function that populates the mutator flyout with
-   * blocks representing this block's configuration.
-   *
-   * @param workspace The mutator flyout's workspace.
-   * @returns The root block created in the flyout's workspace.
+   * An optional function that populates the mutator's dialog with
+   * this block's components.
    */
-  decompose?: (workspace: Workspace) => Block;
-
+  decompose?: (p1: Workspace) => Block;
   id: string;
   outputConnection: Connection | null = null;
   nextConnection: Connection | null = null;
@@ -177,7 +167,7 @@ export class Block {
   inputList: Input[] = [];
   inputsInline?: boolean;
   icons: IIcon[] = [];
-  private disabledReasons = new Set<string>();
+  private disabled = false;
   tooltip: Tooltip.TipInfo = '';
   contextMenu = true;
 
@@ -185,13 +175,13 @@ export class Block {
 
   protected childBlocks_: this[] = [];
 
-  private deletable = true;
+  private deletable_ = true;
 
-  private movable = true;
+  private movable_ = true;
 
-  private editable = true;
+  private editable_ = true;
 
-  private shadow = false;
+  private isShadow_ = false;
 
   protected collapsed_ = false;
   protected outputShape_: number | null = null;
@@ -199,16 +189,9 @@ export class Block {
   /**
    * Is the current block currently in the process of being disposed?
    */
-  protected disposing = false;
+  private disposing = false;
 
-  /**
-   * Has this block been fully initialized? E.g. all fields initailized.
-   *
-   * @internal
-   */
-  initialized = false;
-
-  private readonly xy: Coordinate;
+  private readonly xy_: Coordinate;
   isInFlyout: boolean;
   isInMutator: boolean;
   RTL: boolean;
@@ -219,16 +202,15 @@ export class Block {
   /** Name of the type of hat. */
   hat?: string;
 
-  /** Is this block a BlockSVG? */
-  readonly rendered: boolean = false;
+  rendered: boolean | null = null;
 
   /**
    * String for block help, or function that returns a URL. Null for no help.
    */
-  helpUrl: string | (() => string) | null = null;
+  helpUrl: string | Function | null = null;
 
   /** A bound callback function to use when the parent workspace changes. */
-  private onchangeWrapper: ((p1: Abstract) => void) | null = null;
+  private onchangeWrapper_: ((p1: Abstract) => void) | null = null;
 
   /**
    * A count of statement inputs on the block.
@@ -261,7 +243,7 @@ export class Block {
      * The block's position in workspace units.  (0, 0) is at the workspace's
      * origin; scale does not change this value.
      */
-    this.xy = new Coordinate(0, 0);
+    this.xy_ = new Coordinate(0, 0);
     this.isInFlyout = workspace.isFlyout;
     this.isInMutator = workspace.isMutator;
 
@@ -306,7 +288,7 @@ export class Block {
 
       // Fire a create event.
       if (eventUtils.isEnabled()) {
-        eventUtils.fire(new (eventUtils.get(EventType.BLOCK_CREATE))(this));
+        eventUtils.fire(new (eventUtils.get(eventUtils.BLOCK_CREATE))(this));
       }
     } finally {
       eventUtils.setGroup(existingGroup);
@@ -328,20 +310,20 @@ export class Block {
    *     statement with the previous statement.  Otherwise, dispose of all
    *     children of this block.
    */
-  dispose(healStack = false) {
-    this.disposing = true;
+  dispose(healStack: boolean) {
+    if (this.isDeadOrDying()) return;
 
     // Dispose of this change listener before unplugging.
     // Technically not necessary due to the event firing delay.
     // But future-proofing.
-    if (this.onchangeWrapper) {
-      this.workspace.removeChangeListener(this.onchangeWrapper);
+    if (this.onchangeWrapper_) {
+      this.workspace.removeChangeListener(this.onchangeWrapper_);
     }
 
     this.unplug(healStack);
     if (eventUtils.isEnabled()) {
       // Constructing the delete event is costly. Only perform if necessary.
-      eventUtils.fire(new (eventUtils.get(EventType.BLOCK_DELETE))(this));
+      eventUtils.fire(new (eventUtils.get(eventUtils.BLOCK_DELETE))(this));
     }
     this.workspace.removeTopBlock(this);
     this.disposeInternal();
@@ -352,13 +334,15 @@ export class Block {
    * E.g. does not fire events, unplug the block, etc.
    */
   protected disposeInternal() {
-    this.disposing = true;
-    if (this.onchangeWrapper) {
-      this.workspace.removeChangeListener(this.onchangeWrapper);
+    if (this.isDeadOrDying()) return;
+
+    if (this.onchangeWrapper_) {
+      this.workspace.removeChangeListener(this.onchangeWrapper_);
     }
 
     this.workspace.removeTypedBlock(this);
     this.workspace.removeBlockById(this.id);
+    this.disposing = true;
 
     if (typeof this.destroy === 'function') this.destroy();
 
@@ -388,11 +372,13 @@ export class Block {
    * change).
    */
   initModel() {
-    if (this.initialized) return;
     for (const input of this.inputList) {
-      input.initModel();
+      for (const field of input.fieldRow) {
+        if (field.initModel) {
+          field.initModel();
+        }
+      }
     }
-    this.initialized = true;
   }
 
   /**
@@ -404,10 +390,10 @@ export class Block {
    */
   unplug(opt_healStack?: boolean) {
     if (this.outputConnection) {
-      this.unplugFromRow(opt_healStack);
+      this.unplugFromRow_(opt_healStack);
     }
     if (this.previousConnection) {
-      this.unplugFromStack(opt_healStack);
+      this.unplugFromStack_(opt_healStack);
     }
   }
 
@@ -418,7 +404,7 @@ export class Block {
    * @param opt_healStack Disconnect right-side block and connect to left-side
    *     block.  Defaults to false.
    */
-  private unplugFromRow(opt_healStack?: boolean) {
+  private unplugFromRow_(opt_healStack?: boolean) {
     let parentConnection = null;
     if (this.outputConnection?.isConnected()) {
       parentConnection = this.outputConnection.targetConnection;
@@ -431,7 +417,7 @@ export class Block {
       return;
     }
 
-    const thisConnection = this.getOnlyValueConnection();
+    const thisConnection = this.getOnlyValueConnection_();
     if (
       !thisConnection ||
       !thisConnection.isConnected() ||
@@ -468,7 +454,7 @@ export class Block {
    *
    * @returns The connection on the value input, or null.
    */
-  private getOnlyValueConnection(): Connection | null {
+  private getOnlyValueConnection_(): Connection | null {
     let connection = null;
     for (let i = 0; i < this.inputList.length; i++) {
       const thisConnection = this.inputList[i].connection;
@@ -493,7 +479,7 @@ export class Block {
    * @param opt_healStack Disconnect child statement and reconnect stack.
    *     Defaults to false.
    */
-  private unplugFromStack(opt_healStack?: boolean) {
+  private unplugFromStack_(opt_healStack?: boolean) {
     let previousTarget = null;
     if (this.previousConnection?.isConnected()) {
       // Remember the connection that any next statements need to connect to.
@@ -573,6 +559,7 @@ export class Block {
    * connected should not coincidentally line up on screen.
    */
   bumpNeighbours() {}
+  // noop.
 
   /**
    * Return the parent block or null if this block is at the top level. The
@@ -725,7 +712,7 @@ export class Block {
     }
 
     // Check that block is connected to new parent if new parent is not null and
-    // that block is not connected to superior one if new parent is null.
+    //    that block is not connected to superior one if new parent is null.
     const targetBlock =
       (this.previousConnection && this.previousConnection.targetBlock()) ||
       (this.outputConnection && this.outputConnection.targetBlock());
@@ -743,13 +730,14 @@ export class Block {
     }
 
     // This block hasn't actually moved on-screen, so there's no need to
-    // update its connection locations.
+    // update
+    //     its connection locations.
     if (this.parentBlock_) {
       // Remove this block from the old parent's child list.
       arrayUtils.removeElem(this.parentBlock_.childBlocks_, this);
     } else {
-      // New parent must be non-null so remove this block from the
-      // workspace's list of top-most blocks.
+      // New parent must be non-null so remove this block from the workspace's
+      //     list of top-most blocks.
       this.workspace.removeTopBlock(this);
     }
 
@@ -790,11 +778,10 @@ export class Block {
    */
   isDeletable(): boolean {
     return (
-      this.deletable &&
-      !this.isInFlyout &&
-      !this.shadow &&
+      this.deletable_ &&
+      !this.isShadow_ &&
       !this.isDeadOrDying() &&
-      !this.workspace.isReadOnly()
+      !this.workspace.options.readOnly
     );
   }
 
@@ -804,7 +791,7 @@ export class Block {
    * @returns True if the block's deletable property is true, false otherwise.
    */
   isOwnDeletable(): boolean {
-    return this.deletable;
+    return this.deletable_;
   }
 
   /**
@@ -813,7 +800,7 @@ export class Block {
    * @param deletable True if deletable.
    */
   setDeletable(deletable: boolean) {
-    this.deletable = deletable;
+    this.deletable_ = deletable;
   }
 
   /**
@@ -824,11 +811,10 @@ export class Block {
    */
   isMovable(): boolean {
     return (
-      this.movable &&
-      !this.isInFlyout &&
-      !this.shadow &&
+      this.movable_ &&
+      !this.isShadow_ &&
       !this.isDeadOrDying() &&
-      !this.workspace.isReadOnly()
+      !this.workspace.options.readOnly
     );
   }
 
@@ -839,7 +825,7 @@ export class Block {
    * @internal
    */
   isOwnMovable(): boolean {
-    return this.movable;
+    return this.movable_;
   }
 
   /**
@@ -848,7 +834,7 @@ export class Block {
    * @param movable True if movable.
    */
   setMovable(movable: boolean) {
-    this.movable = movable;
+    this.movable_ = movable;
   }
 
   /**
@@ -874,7 +860,7 @@ export class Block {
    * @returns True if a shadow.
    */
   isShadow(): boolean {
-    return this.shadow;
+    return this.isShadow_;
   }
 
   /**
@@ -886,7 +872,7 @@ export class Block {
    * @internal
    */
   setShadow(shadow: boolean) {
-    this.shadow = shadow;
+    this.isShadow_ = shadow;
   }
 
   /**
@@ -917,7 +903,9 @@ export class Block {
    */
   isEditable(): boolean {
     return (
-      this.editable && !this.isDeadOrDying() && !this.workspace.isReadOnly()
+      this.editable_ &&
+      !this.isDeadOrDying() &&
+      !this.workspace.options.readOnly
     );
   }
 
@@ -927,7 +915,7 @@ export class Block {
    * @returns True if the block's editable property is true, false otherwise.
    */
   isOwnEditable(): boolean {
-    return this.editable;
+    return this.editable_;
   }
 
   /**
@@ -936,9 +924,11 @@ export class Block {
    * @param editable True if editable.
    */
   setEditable(editable: boolean) {
-    this.editable = editable;
-    for (const field of this.getFields()) {
-      field.updateEditable();
+    this.editable_ = editable;
+    for (let i = 0, input; (input = this.inputList[i]); i++) {
+      for (let j = 0, field; (field = input.fieldRow[j]); j++) {
+        field.updateEditable();
+      }
     }
   }
 
@@ -997,7 +987,7 @@ export class Block {
    * @param url URL string for block help, or function that returns a URL.  Null
    *     for no help.
    */
-  setHelpUrl(url: string | (() => string)) {
+  setHelpUrl(url: string | Function) {
     this.helpUrl = url;
   }
 
@@ -1045,7 +1035,7 @@ export class Block {
    * @returns Hue value (0-360).
    */
   getHue(): number | null {
-    return this.hue;
+    return this.hue_;
   }
 
   /**
@@ -1056,7 +1046,7 @@ export class Block {
    */
   setColour(colour: number | string) {
     const parsed = parsing.parseBlockColour(colour);
-    this.hue = parsed.hue;
+    this.hue_ = parsed.hue;
     this.colour_ = parsed.hex;
   }
 
@@ -1082,12 +1072,12 @@ export class Block {
     if (onchangeFn && typeof onchangeFn !== 'function') {
       throw Error('onchange must be a function.');
     }
-    if (this.onchangeWrapper) {
-      this.workspace.removeChangeListener(this.onchangeWrapper);
+    if (this.onchangeWrapper_) {
+      this.workspace.removeChangeListener(this.onchangeWrapper_);
     }
     this.onchange = onchangeFn;
-    this.onchangeWrapper = onchangeFn.bind(this);
-    this.workspace.addChangeListener(this.onchangeWrapper);
+    this.onchangeWrapper_ = onchangeFn.bind(this);
+    this.workspace.addChangeListener(this.onchangeWrapper_);
   }
 
   /**
@@ -1105,25 +1095,14 @@ export class Block {
           ' instead',
       );
     }
-    for (const field of this.getFields()) {
-      if (field.name === name) {
-        return field;
+    for (let i = 0, input; (input = this.inputList[i]); i++) {
+      for (let j = 0, field; (field = input.fieldRow[j]); j++) {
+        if (field.name === name) {
+          return field;
+        }
       }
     }
     return null;
-  }
-
-  /**
-   * Returns a generator that provides every field on the block.
-   *
-   * @yields A generator that can be used to iterate the fields on the block.
-   */
-  *getFields(): Generator<Field> {
-    for (const input of this.inputList) {
-      for (const field of input.fieldRow) {
-        yield field;
-      }
-    }
   }
 
   /**
@@ -1133,9 +1112,12 @@ export class Block {
    */
   getVars(): string[] {
     const vars: string[] = [];
-    for (const field of this.getFields()) {
-      if (field.referencesVariables()) {
-        vars.push(field.getValue());
+    for (let i = 0, input; (input = this.inputList[i]); i++) {
+      for (let j = 0, field; (field = input.fieldRow[j]); j++) {
+        if (field.referencesVariables()) {
+          // NOTE: This only applies to `FieldVariable`, a `Field<string>`
+          vars.push(field.getValue() as string);
+        }
       }
     }
     return vars;
@@ -1147,17 +1129,19 @@ export class Block {
    * @returns List of variable models.
    * @internal
    */
-  getVarModels(): IVariableModel<IVariableState>[] {
+  getVarModels(): VariableModel[] {
     const vars = [];
-    for (const field of this.getFields()) {
-      if (field.referencesVariables()) {
-        const model = this.workspace.getVariableById(
-          field.getValue() as string,
-        );
-        // Check if the variable actually exists (and isn't just a potential
-        // variable).
-        if (model) {
-          vars.push(model);
+    for (let i = 0, input; (input = this.inputList[i]); i++) {
+      for (let j = 0, field; (field = input.fieldRow[j]); j++) {
+        if (field.referencesVariables()) {
+          const model = this.workspace.getVariableById(
+            field.getValue() as string,
+          );
+          // Check if the variable actually exists (and isn't just a potential
+          // variable).
+          if (model) {
+            vars.push(model);
+          }
         }
       }
     }
@@ -1171,13 +1155,15 @@ export class Block {
    * @param variable The variable being renamed.
    * @internal
    */
-  updateVarName(variable: IVariableModel<IVariableState>) {
-    for (const field of this.getFields()) {
-      if (
-        field.referencesVariables() &&
-        variable.getId() === field.getValue()
-      ) {
-        field.refreshVariableName();
+  updateVarName(variable: VariableModel) {
+    for (let i = 0, input; (input = this.inputList[i]); i++) {
+      for (let j = 0, field; (field = input.fieldRow[j]); j++) {
+        if (
+          field.referencesVariables() &&
+          variable.getId() === field.getValue()
+        ) {
+          field.refreshVariableName();
+        }
       }
     }
   }
@@ -1191,9 +1177,11 @@ export class Block {
    *     updated name.
    */
   renameVarById(oldId: string, newId: string) {
-    for (const field of this.getFields()) {
-      if (field.referencesVariables() && oldId === field.getValue()) {
-        field.setValue(newId);
+    for (let i = 0, input; (input = this.inputList[i]); i++) {
+      for (let j = 0, field; (field = input.fieldRow[j]); j++) {
+        if (field.referencesVariables() && oldId === field.getValue()) {
+          field.setValue(newId);
+        }
       }
     }
   }
@@ -1331,7 +1319,7 @@ export class Block {
   setInputsInline(newBoolean: boolean) {
     if (this.inputsInline !== newBoolean) {
       eventUtils.fire(
-        new (eventUtils.get(EventType.BLOCK_CHANGE))(
+        new (eventUtils.get(eventUtils.BLOCK_CHANGE))(
           this,
           'inline',
           null,
@@ -1400,66 +1388,32 @@ export class Block {
   }
 
   /**
-   * Get whether this block is enabled or not. A block is considered enabled
-   * if there aren't any reasons why it would be disabled. A block may still
-   * be disabled for other reasons even if the user attempts to manually
-   * enable it, such as when the block is in an invalid location.
+   * Get whether this block is enabled or not.
    *
    * @returns True if enabled.
    */
   isEnabled(): boolean {
-    return this.disabledReasons.size === 0;
+    return !this.disabled;
   }
 
   /**
-   * Add or remove a reason why the block might be disabled. If a block has
-   * any reasons to be disabled, then the block itself will be considered
-   * disabled. A block could be disabled for multiple independent reasons
-   * simultaneously, such as when the user manually disables it, or the block
-   * is invalid.
+   * Set whether the block is enabled or not.
    *
-   * @param disabled If true, then the block should be considered disabled for
-   *     at least the provided reason, otherwise the block is no longer disabled
-   *     for that reason.
-   * @param reason A language-neutral identifier for a reason why the block
-   *     could be disabled. Call this method again with the same identifier to
-   *     update whether the block is currently disabled for this reason.
+   * @param enabled True if enabled.
    */
-  setDisabledReason(disabled: boolean, reason: string): void {
-    // Workspaces that were serialized before the reason for being disabled
-    // could be specified may have blocks that are disabled without a known
-    // reason. On being loaded, these blocks will default to having the manually
-    // disabled reason. However, if the user isn't allowed to manually disable
-    // or enable blocks, then this manually disabled reason cannot be removed.
-    // For backward compatibility with these legacy workspaces, when removing
-    // any disabled reason and the workspace does not allow manually disabling
-    // but the block is manually disabled, then remove the manually disabled
-    // reason in addition to the more specific reason. For example, when an
-    // orphaned block is no longer orphaned, the block should be enabled again.
-    if (
-      !disabled &&
-      !this.workspace.options.disable &&
-      this.hasDisabledReason(constants.MANUALLY_DISABLED) &&
-      reason != constants.MANUALLY_DISABLED
-    ) {
-      this.setDisabledReason(false, constants.MANUALLY_DISABLED);
-    }
-
-    if (this.disabledReasons.has(reason) !== disabled) {
-      if (disabled) {
-        this.disabledReasons.add(reason);
-      } else {
-        this.disabledReasons.delete(reason);
-      }
-      const blockChangeEvent = new (eventUtils.get(EventType.BLOCK_CHANGE))(
-        this,
-        'disabled',
-        /* name= */ null,
-        /* oldValue= */ !disabled,
-        /* newValue= */ disabled,
-      ) as BlockChange;
-      blockChangeEvent.setDisabledReason(reason);
-      eventUtils.fire(blockChangeEvent);
+  setEnabled(enabled: boolean) {
+    if (this.isEnabled() !== enabled) {
+      const oldValue = this.disabled;
+      this.disabled = !enabled;
+      eventUtils.fire(
+        new (eventUtils.get(eventUtils.BLOCK_CHANGE))(
+          this,
+          'disabled',
+          null,
+          oldValue,
+          !enabled,
+        ),
+      );
     }
   }
 
@@ -1472,34 +1426,13 @@ export class Block {
   getInheritedDisabled(): boolean {
     let ancestor = this.getSurroundParent();
     while (ancestor) {
-      if (!ancestor.isEnabled()) {
+      if (ancestor.disabled) {
         return true;
       }
       ancestor = ancestor.getSurroundParent();
     }
     // Ran off the top.
     return false;
-  }
-
-  /**
-   * Get whether the block is currently disabled for the provided reason.
-   *
-   * @param reason A language-neutral identifier for a reason why the block
-   *     could be disabled.
-   * @returns Whether the block is disabled for the provided reason.
-   */
-  hasDisabledReason(reason: string): boolean {
-    return this.disabledReasons.has(reason);
-  }
-
-  /**
-   * Get a set of reasons why the block is currently disabled, if any. If the
-   * block is enabled, this set will be empty.
-   *
-   * @returns The set of reasons why the block is disabled, if any.
-   */
-  getDisabledReasons(): ReadonlySet<string> {
-    return this.disabledReasons;
   }
 
   /**
@@ -1519,7 +1452,7 @@ export class Block {
   setCollapsed(collapsed: boolean) {
     if (this.collapsed_ !== collapsed) {
       eventUtils.fire(
-        new (eventUtils.get(EventType.BLOCK_CHANGE))(
+        new (eventUtils.get(eventUtils.BLOCK_CHANGE))(
           this,
           'collapsed',
           null,
@@ -1593,7 +1526,8 @@ export class Block {
         checks = connection.targetConnection.getCheck();
       }
       return (
-        !!checks && (checks.includes('Boolean') || checks.includes('Number'))
+        !!checks &&
+        (checks.indexOf('Boolean') !== -1 || checks.indexOf('Number') !== -1)
       );
     }
 
@@ -1733,15 +1667,15 @@ export class Block {
     if (json['style'] && json['colour']) {
       throw Error(warningPrefix + 'Must not have both a colour and a style.');
     } else if (json['style']) {
-      this.jsonInitStyle(json, warningPrefix);
+      this.jsonInitStyle_(json, warningPrefix);
     } else {
-      this.jsonInitColour(json, warningPrefix);
+      this.jsonInitColour_(json, warningPrefix);
     }
 
     // Interpolate the message blocks.
     let i = 0;
     while (json['message' + i] !== undefined) {
-      this.interpolate(
+      this.interpolate_(
         json['message' + i],
         json['args' + i] || [],
         // Backwards compatibility: lastDummyAlign aliases implicitAlign.
@@ -1816,7 +1750,7 @@ export class Block {
    * @param json Structured data describing the block.
    * @param warningPrefix Warning prefix string identifying block.
    */
-  private jsonInitColour(json: AnyDuringMigration, warningPrefix: string) {
+  private jsonInitColour_(json: AnyDuringMigration, warningPrefix: string) {
     if ('colour' in json) {
       if (json['colour'] === undefined) {
         console.warn(warningPrefix + 'Undefined colour value.');
@@ -1824,7 +1758,7 @@ export class Block {
         const rawValue = json['colour'];
         try {
           this.setColour(rawValue);
-        } catch {
+        } catch (e) {
           console.warn(warningPrefix + 'Illegal colour value: ', rawValue);
         }
       }
@@ -1837,11 +1771,11 @@ export class Block {
    * @param json Structured data describing the block.
    * @param warningPrefix Warning prefix string identifying block.
    */
-  private jsonInitStyle(json: AnyDuringMigration, warningPrefix: string) {
+  private jsonInitStyle_(json: AnyDuringMigration, warningPrefix: string) {
     const blockStyleName = json['style'];
     try {
       this.setStyle(blockStyleName);
-    } catch {
+    } catch (styleError) {
       console.warn(warningPrefix + 'Style does not exist: ', blockStyleName);
     }
   }
@@ -1889,21 +1823,21 @@ export class Block {
    *     of newline tokens, how should it be aligned?
    * @param warningPrefix Warning prefix string identifying block.
    */
-  private interpolate(
+  private interpolate_(
     message: string,
     args: AnyDuringMigration[],
     implicitAlign: string | undefined,
     warningPrefix: string,
   ) {
     const tokens = parsing.tokenizeInterpolation(message);
-    this.validateTokens(tokens, args.length);
-    const elements = this.interpolateArguments(tokens, args, implicitAlign);
+    this.validateTokens_(tokens, args.length);
+    const elements = this.interpolateArguments_(tokens, args, implicitAlign);
 
     // An array of [field, fieldName] tuples.
     const fieldStack = [];
     for (let i = 0, element; (element = elements[i]); i++) {
-      if (this.isInputKeyword(element['type'])) {
-        const input = this.inputFromJson(element, warningPrefix);
+      if (this.isInputKeyword_(element['type'])) {
+        const input = this.inputFromJson_(element, warningPrefix);
         // Should never be null, but just in case.
         if (input) {
           for (let j = 0, tuple; (tuple = fieldStack[j]); j++) {
@@ -1914,7 +1848,7 @@ export class Block {
       } else {
         // All other types, including ones starting with 'input_' get routed
         // here.
-        const field = this.fieldFromJson(element);
+        const field = this.fieldFromJson_(element);
         if (field) {
           fieldStack.push([field, element['name']]);
         }
@@ -1930,7 +1864,7 @@ export class Block {
    * @param tokens An array of tokens to validate
    * @param argsCount The number of args that need to be referred to.
    */
-  private validateTokens(tokens: Array<string | number>, argsCount: number) {
+  private validateTokens_(tokens: Array<string | number>, argsCount: number) {
     const visitedArgsHash = [];
     let visitedArgsCount = 0;
     for (let i = 0; i < tokens.length; i++) {
@@ -1985,7 +1919,7 @@ export class Block {
    *     or dummy inputs, if necessary.
    * @returns The JSON definitions of field and inputs to add to the block.
    */
-  private interpolateArguments(
+  private interpolateArguments_(
     tokens: Array<string | number>,
     args: Array<AnyDuringMigration | string>,
     implicitAlign: string | undefined,
@@ -2008,7 +1942,7 @@ export class Block {
         } else {
           // AnyDuringMigration because:  Type '{ text: string; type: string; }
           // | null' is not assignable to type 'string | number'.
-          element = this.stringToFieldJson(element) as AnyDuringMigration;
+          element = this.stringToFieldJson_(element) as AnyDuringMigration;
           if (!element) {
             continue;
           }
@@ -2020,7 +1954,9 @@ export class Block {
     const length = elements.length;
     if (
       length &&
-      !this.isInputKeyword((elements as AnyDuringMigration)[length - 1]['type'])
+      !this.isInputKeyword_(
+        (elements as AnyDuringMigration)[length - 1]['type'],
+      )
     ) {
       const dummyInput = {'type': 'input_dummy'};
       if (implicitAlign) {
@@ -2040,7 +1976,7 @@ export class Block {
    * @param element The element to try to turn into a field.
    * @returns The field defined by the JSON, or null if one couldn't be created.
    */
-  private fieldFromJson(element: {
+  private fieldFromJson_(element: {
     alt?: string;
     type: string;
     text?: string;
@@ -2048,10 +1984,10 @@ export class Block {
     const field = fieldRegistry.fromJson(element);
     if (!field && element['alt']) {
       if (typeof element['alt'] === 'string') {
-        const json = this.stringToFieldJson(element['alt']);
-        return json ? this.fieldFromJson(json) : null;
+        const json = this.stringToFieldJson_(element['alt']);
+        return json ? this.fieldFromJson_(json) : null;
       }
-      return this.fieldFromJson(element['alt']);
+      return this.fieldFromJson_(element['alt']);
     }
     return field;
   }
@@ -2066,7 +2002,7 @@ export class Block {
    * @returns The input that has been created, or null if one could not be
    *     created for some reason (should never happen).
    */
-  private inputFromJson(
+  private inputFromJson_(
     element: AnyDuringMigration,
     warningPrefix: string,
   ): Input | null {
@@ -2124,7 +2060,7 @@ export class Block {
    * @returns True if the given string matches one of the input keywords, false
    *     otherwise.
    */
-  private isInputKeyword(str: string): boolean {
+  private isInputKeyword_(str: string): boolean {
     return (
       str === 'input_value' ||
       str === 'input_statement' ||
@@ -2141,7 +2077,7 @@ export class Block {
    * @param str String to turn into the JSON definition of a label field.
    * @returns The JSON definition or null.
    */
-  private stringToFieldJson(str: string): {text: string; type: string} | null {
+  private stringToFieldJson_(str: string): {text: string; type: string} | null {
     str = str.trim();
     if (str) {
       return {
@@ -2273,7 +2209,7 @@ export class Block {
    * @returns Block's comment.
    */
   getCommentText(): string | null {
-    const comment = this.getIcon(IconType.COMMENT);
+    const comment = this.getIcon(CommentIcon.TYPE) as CommentIcon | null;
     return comment?.getText() ?? null;
   }
 
@@ -2283,40 +2219,23 @@ export class Block {
    * @param text The text, or null to delete.
    */
   setCommentText(text: string | null) {
-    const comment = this.getIcon(IconType.COMMENT);
+    const comment = this.getIcon(CommentIcon.TYPE) as CommentIcon | null;
     const oldText = comment?.getText() ?? null;
     if (oldText === text) return;
     if (text !== null) {
-      let comment = this.getIcon(IconType.COMMENT);
+      let comment = this.getIcon(CommentIcon.TYPE) as CommentIcon | undefined;
       if (!comment) {
-        const commentConstructor = registry.getClass(
-          registry.Type.ICON,
-          IconType.COMMENT.toString(),
-          false,
-        );
-        if (!commentConstructor) {
-          throw new Error(
-            'No comment icon class is registered, so a comment cannot be set',
-          );
-        }
-        const icon = new commentConstructor(this);
-        if (!isCommentIcon(icon)) {
-          throw new Error(
-            'The class registered as a comment icon does not conform to the ' +
-              'ICommentIcon interface',
-          );
-        }
-        comment = this.addIcon(icon);
+        comment = this.addIcon(new CommentIcon(this));
       }
       eventUtils.disable();
       comment.setText(text);
       eventUtils.enable();
     } else {
-      this.removeIcon(IconType.COMMENT);
+      this.removeIcon(CommentIcon.TYPE);
     }
 
     eventUtils.fire(
-      new (eventUtils.get(EventType.BLOCK_CHANGE))(
+      new (eventUtils.get(eventUtils.BLOCK_CHANGE))(
         this,
         'comment',
         null,
@@ -2402,7 +2321,7 @@ export class Block {
    * @returns Object with .x and .y properties.
    */
   getRelativeToSurfaceXY(): Coordinate {
-    return this.xy;
+    return this.xy_;
   }
 
   /**
@@ -2416,9 +2335,11 @@ export class Block {
     if (this.parentBlock_) {
       throw Error('Block has parent');
     }
-    const event = new (eventUtils.get(EventType.BLOCK_MOVE))(this) as BlockMove;
-    if (reason) event.setReason(reason);
-    this.xy.translate(dx, dy);
+    const event = new (eventUtils.get(eventUtils.BLOCK_MOVE))(
+      this,
+    ) as BlockMove;
+    reason && event.setReason(reason);
+    this.xy_.translate(dx, dy);
     event.recordNew();
     eventUtils.fire(event);
   }
@@ -2477,7 +2398,7 @@ export class Block {
    *
    * Intended to on be used in console logs and errors. If you need a string
    * that uses the user's native language (including block text, field values,
-   * and child blocks), use {@link (Block:class).toString | toString()}.
+   * and child blocks), use [toString()]{@link Block#toString}.
    *
    * @returns The description.
    */

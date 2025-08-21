@@ -26,6 +26,7 @@
 
       function createWorkspace(blocklyDiv, options) {
         var workspace = Blockly.inject(blocklyDiv, options);
+        workspace.configureContextMenu = configureContextMenu.bind(workspace);
         return workspace;
       }
 
@@ -100,8 +101,6 @@
           },
         };
 
-        Blockly.ContextMenuItems.registerCommentOptions();
-
         createPlayground(
           document.getElementById('root'),
           createWorkspace,
@@ -125,6 +124,23 @@
         ) {
           document.body.style.backgroundColor = '#d6d6ff'; // Familliar lilac.
         }
+      }
+
+      function configureContextMenu(menuOptions, e) {
+        var workspace = this;
+        var screenshotOption = {
+          text: 'Download Screenshot',
+          enabled: workspace.getTopBlocks().length,
+          callback: function () {
+            downloadScreenshot(workspace);
+          },
+        };
+        menuOptions.push(screenshotOption);
+
+        // Adds a default-sized workspace comment to the workspace.
+        menuOptions.push(
+          Blockly.ContextMenu.workspaceCommentOption(workspace, e),
+        );
       }
       start();
     </script>

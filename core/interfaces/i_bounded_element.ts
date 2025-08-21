@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Former goog.module ID: Blockly.IBoundedElement
-
 import type {Rect} from '../utils/rect.js';
+// Former goog.module ID: Blockly.IBoundedElement
 
 /**
  * A bounded element interface.

@@ -8,6 +8,7 @@
 
 import type {RenderedConnection} from '../../rendered_connection.js';
 import type {ConstantProvider} from '../common/constants.js';
+
 import {Connection} from './connection.js';
 import {Types} from './types.js';
 

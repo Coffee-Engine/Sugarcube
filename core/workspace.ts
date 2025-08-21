@@ -16,35 +16,29 @@ import './connection_checker.js';
 
 import type {Block} from './block.js';
 import type {BlocklyOptions} from './blockly_options.js';
-import {WorkspaceComment} from './comments/workspace_comment.js';
-import * as common from './common.js';
 import type {ConnectionDB} from './connection_db.js';
 import type {Abstract} from './events/events_abstract.js';
+import * as common from './common.js';
 import * as eventUtils from './events/utils.js';
-import type {IBoundedElement} from './interfaces/i_bounded_element.js';
+import type {IASTNodeLocation} from './interfaces/i_ast_node_location.js';
 import type {IConnectionChecker} from './interfaces/i_connection_checker.js';
-import {IProcedureMap} from './interfaces/i_procedure_map.js';
-import type {IVariableMap} from './interfaces/i_variable_map.js';
-import type {
-  IVariableModel,
-  IVariableState,
-} from './interfaces/i_variable_model.js';
-import {ObservableProcedureMap} from './observable_procedure_map.js';
 import {Options} from './options.js';
 import * as registry from './registry.js';
 import * as arrayUtils from './utils/array.js';
-import * as deprecation from './utils/deprecation.js';
 import * as idGenerator from './utils/idgenerator.js';
 import * as math from './utils/math.js';
-import {Rect} from './utils/rect.js';
 import type * as toolbox from './utils/toolbox.js';
-import {deleteVariable, getVariableUsesById} from './variables.js';
+import {VariableMap} from './variable_map.js';
+import type {VariableModel} from './variable_model.js';
+import type {WorkspaceComment} from './workspace_comment.js';
+import {IProcedureMap} from './interfaces/i_procedure_map.js';
+import {ObservableProcedureMap} from './observable_procedure_map.js';
 
 /**
  * Class for a workspace.  This is a data structure that contains blocks.
  * There is no UI, and can be created headlessly.
  */
-export class Workspace {
+export class Workspace implements IASTNodeLocation {
   /**
    * Angle away from the horizontal to sweep for blocks.  Order of execution is
    * generally top to bottom, but a small angle changes the scan to give a bit
@@ -108,14 +102,13 @@ export class Workspace {
   private readonly topBlocks: Block[] = [];
   private readonly topComments: WorkspaceComment[] = [];
   private readonly commentDB = new Map<string, WorkspaceComment>();
-  private readonly listeners: ((e: Abstract) => void)[] = [];
+  private readonly listeners: Function[] = [];
   protected undoStack_: Abstract[] = [];
   protected redoStack_: Abstract[] = [];
   private readonly blockDB = new Map<string, Block>();
   private readonly typedBlocksDB = new Map<string, Block[]>();
-  private variableMap: IVariableMap<IVariableModel<IVariableState>>;
+  private variableMap: VariableMap;
   private procedureMap: IProcedureMap = new ObservableProcedureMap();
-  private readOnly = false;
 
   /**
    * Blocks in the flyout can refer to variables that don't exist in the main
@@ -125,9 +118,7 @@ export class Workspace {
    * these by tracking "potential" variables in the flyout.  These variables
    * become real when references to them are dragged into the main workspace.
    */
-  private potentialVariableMap: IVariableMap<
-    IVariableModel<IVariableState>
-  > | null = null;
+  private potentialVariableMap: VariableMap | null = null;
 
   /** @param opt_options Dictionary of options. */
   constructor(opt_options?: Options) {
@@ -153,10 +144,7 @@ export class Workspace {
      * all of the named variables in the workspace, including variables that are
      * not currently in use.
      */
-    const VariableMap = this.getVariableMapClass();
     this.variableMap = new VariableMap(this);
-
-    this.setIsReadOnly(this.options.readOnly);
   }
 
   /**
@@ -179,35 +167,14 @@ export class Workspace {
    * @returns The comparison value. This tells Array.sort() how to change object
    *     a's index.
    */
-  private sortObjects(
+  private sortObjects_(
     a: Block | WorkspaceComment,
     b: Block | WorkspaceComment,
   ): number {
-    const wrap = (element: Block | WorkspaceComment) => {
-      return {
-        getBoundingRectangle: () => {
-          const xy = element.getRelativeToSurfaceXY();
-          return new Rect(xy.y, xy.y, xy.x, xy.x);
-        },
-        moveBy: () => {},
-      };
-    };
-    return this.sortByOrigin(wrap(a), wrap(b));
-  }
-
-  /**
-   * Sorts bounded elements on the workspace by their relative position, top to
-   * bottom (with slight LTR or RTL bias).
-   *
-   * @param a The first element to sort.
-   * @param b The second elment to sort.
-   * @returns -1, 0 or 1 depending on the sort order.
-   */
-  protected sortByOrigin(a: IBoundedElement, b: IBoundedElement): number {
     const offset =
       Math.sin(math.toRadians(Workspace.SCAN_ANGLE)) * (this.RTL ? -1 : 1);
-    const aXY = a.getBoundingRectangle().getOrigin();
-    const bXY = b.getBoundingRectangle().getOrigin();
+    const aXY = a.getRelativeToSurfaceXY();
+    const bXY = b.getRelativeToSurfaceXY();
     return aXY.y + offset * aXY.x - (bXY.y + offset * bXY.x);
   }
 
@@ -242,7 +209,7 @@ export class Workspace {
     // Copy the topBlocks list.
     const blocks = new Array<Block>().concat(this.topBlocks);
     if (ordered && blocks.length > 1) {
-      blocks.sort(this.sortObjects.bind(this));
+      blocks.sort(this.sortObjects_.bind(this));
     }
     return blocks;
   }
@@ -285,10 +252,12 @@ export class Workspace {
     }
     const blocks = this.typedBlocksDB.get(type)!.slice(0);
     if (ordered && blocks && blocks.length > 1) {
-      blocks.sort(this.sortObjects.bind(this));
+      blocks.sort(this.sortObjects_.bind(this));
     }
 
-    return blocks.filter((block) => !block.isInsertionMarker());
+    return blocks.filter(function (block: Block) {
+      return !block.isInsertionMarker();
+    });
   }
 
   /**
@@ -341,7 +310,7 @@ export class Workspace {
     // Copy the topComments list.
     const comments = new Array<WorkspaceComment>().concat(this.topComments);
     if (ordered && comments.length > 1) {
-      comments.sort(this.sortObjects.bind(this));
+      comments.sort(this.sortObjects_.bind(this));
     }
     return comments;
   }
@@ -372,7 +341,11 @@ export class Workspace {
 
     // Insertion markers exist on the workspace for rendering reasons, but
     // aren't "real" blocks from a developer perspective.
-    return blocks.filter((block) => !block.isInsertionMarker());
+    const filtered = blocks.filter(function (block) {
+      return !block.isInsertionMarker();
+    });
+
+    return filtered;
   }
 
   /** Dispose of all blocks and comments in workspace. */
@@ -390,14 +363,7 @@ export class Workspace {
         this.topComments[this.topComments.length - 1].dispose();
       }
       eventUtils.setGroup(existingGroup);
-      // If this is a flyout workspace, its variable map is shared with the
-      // parent workspace, so we either don't want to disturb it if we're just
-      // disposing the flyout, or if the flyout is being disposed because the
-      // main workspace is being disposed, then the main workspace will handle
-      // cleaning it up.
-      if (!this.isFlyout) {
-        this.variableMap.clear();
-      }
+      this.variableMap.clear();
       if (this.potentialVariableMap) {
         this.potentialVariableMap.clear();
       }
@@ -408,29 +374,19 @@ export class Workspace {
 
   /* Begin functions that are just pass-throughs to the variable map. */
   /**
-   * Rename a variable by updating its name in the variable
-   * map. Identify the variable to rename with the given ID.
+   * Rename a variable by updating its name in the variable map. Identify the
+   * variable to rename with the given ID.
    *
-   * @deprecated v12: use Blockly.Workspace.getVariableMap().renameVariable
    * @param id ID of the variable to rename.
    * @param newName New variable name.
    */
   renameVariableById(id: string, newName: string) {
-    deprecation.warn(
-      'Blockly.Workspace.renameVariableById',
-      'v12',
-      'v13',
-      'Blockly.Workspace.getVariableMap().renameVariable',
-    );
-    const variable = this.variableMap.getVariableById(id);
-    if (!variable) return;
-    this.variableMap.renameVariable(variable, newName);
+    this.variableMap.renameVariableById(id, newName);
   }
 
   /**
    * Create a variable with a given name, optional type, and optional ID.
    *
-   * @deprecated v12: use Blockly.Workspace.getVariableMap().createVariable.
    * @param name The name of the variable. This must be unique across variables
    *     and procedures.
    * @param opt_type The type of the variable like 'int' or 'string'.
@@ -443,79 +399,40 @@ export class Workspace {
     name: string,
     opt_type?: string | null,
     opt_id?: string | null,
-  ): IVariableModel<IVariableState> {
-    deprecation.warn(
-      'Blockly.Workspace.createVariable',
-      'v12',
-      'v13',
-      'Blockly.Workspace.getVariableMap().createVariable',
-    );
-    return this.variableMap.createVariable(
-      name,
-      opt_type ?? undefined,
-      opt_id ?? undefined,
-    );
+  ): VariableModel {
+    return this.variableMap.createVariable(name, opt_type, opt_id);
   }
 
   /**
    * Find all the uses of the given variable, which is identified by ID.
    *
-   * @deprecated v12: use Blockly.Workspace.getVariableMap().getVariableUsesById
    * @param id ID of the variable to find.
    * @returns Array of block usages.
    */
   getVariableUsesById(id: string): Block[] {
-    deprecation.warn(
-      'Blockly.Workspace.getVariableUsesById',
-      'v12',
-      'v13',
-      'Blockly.Workspace.getVariableMap().getVariableUsesById',
-    );
-    return getVariableUsesById(this, id);
+    return this.variableMap.getVariableUsesById(id);
   }
 
   /**
    * Delete a variables by the passed in ID and all of its uses from this
    * workspace. May prompt the user for confirmation.
    *
-   * @deprecated v12: use Blockly.Workspace.getVariableMap().deleteVariable.
    * @param id ID of variable to delete.
    */
   deleteVariableById(id: string) {
-    deprecation.warn(
-      'Blockly.Workspace.deleteVariableById',
-      'v12',
-      'v13',
-      'Blockly.Workspace.getVariableMap().deleteVariable',
-    );
-    const variable = this.variableMap.getVariableById(id);
-    if (!variable) {
-      console.warn(`Can't delete non-existent variable: ${id}`);
-      return;
-    }
-    deleteVariable(this, variable);
+    this.variableMap.deleteVariableById(id);
   }
 
   /**
    * Find the variable by the given name and return it. Return null if not
    * found.
    *
-   * @deprecated v12: use Blockly.Workspace.getVariableMap().getVariable.
    * @param name The name to check for.
    * @param opt_type The type of the variable.  If not provided it defaults to
    *     the empty string, which is a specific type.
    * @returns The variable with the given name.
    */
-  getVariable(
-    name: string,
-    opt_type?: string,
-  ): IVariableModel<IVariableState> | null {
-    deprecation.warn(
-      'Blockly.Workspace.getVariable',
-      'v12',
-      'v13',
-      'Blockly.Workspace.getVariableMap().getVariable',
-    );
+  getVariable(name: string, opt_type?: string): VariableModel | null {
     // TODO (#1559): Possibly delete this function after resolving #1559.
     return this.variableMap.getVariable(name, opt_type);
   }
@@ -523,17 +440,10 @@ export class Workspace {
   /**
    * Find the variable by the given ID and return it. Return null if not found.
    *
-   * @deprecated v12: use Blockly.Workspace.getVariableMap().getVariableById.
    * @param id The ID to check for.
    * @returns The variable with the given ID.
    */
-  getVariableById(id: string): IVariableModel<IVariableState> | null {
-    deprecation.warn(
-      'Blockly.Workspace.getVariableById',
-      'v12',
-      'v13',
-      'Blockly.Workspace.getVariableMap().getVariableById',
-    );
+  getVariableById(id: string): VariableModel | null {
     return this.variableMap.getVariableById(id);
   }
 
@@ -541,51 +451,40 @@ export class Workspace {
    * Find the variable with the specified type. If type is null, return list of
    *     variables with empty string type.
    *
-   * @deprecated v12: use Blockly.Workspace.getVariableMap().getVariablesOfType.
    * @param type Type of the variables to find.
    * @returns The sought after variables of the passed in type. An empty array
    *     if none are found.
    */
-  getVariablesOfType(type: string | null): IVariableModel<IVariableState>[] {
-    deprecation.warn(
-      'Blockly.Workspace.getVariablesOfType',
-      'v12',
-      'v13',
-      'Blockly.Workspace.getVariableMap().getVariablesOfType',
-    );
-    return this.variableMap.getVariablesOfType(type ?? '');
+  getVariablesOfType(type: string | null): VariableModel[] {
+    return this.variableMap.getVariablesOfType(type);
+  }
+
+  /**
+   * Return all variable types.
+   *
+   * @returns List of variable types.
+   * @internal
+   */
+  getVariableTypes(): string[] {
+    return this.variableMap.getVariableTypes(this);
   }
 
   /**
    * Return all variables of all types.
    *
-   * @deprecated v12: use Blockly.Workspace.getVariableMap().getAllVariables.
    * @returns List of variable models.
    */
-  getAllVariables(): IVariableModel<IVariableState>[] {
-    deprecation.warn(
-      'Blockly.Workspace.getAllVariables',
-      'v12',
-      'v13',
-      'Blockly.Workspace.getVariableMap().getAllVariables',
-    );
+  getAllVariables(): VariableModel[] {
     return this.variableMap.getAllVariables();
   }
 
   /**
    * Returns all variable names of all types.
    *
-   * @deprecated v12: use Blockly.Workspace.getVariableMap().getAllVariables.
    * @returns List of all variable names of all types.
    */
   getAllVariableNames(): string[] {
-    deprecation.warn(
-      'Blockly.Workspace.getAllVariableNames',
-      'v12',
-      'v13',
-      'Blockly.Workspace.getVariableMap().getAllVariables',
-    );
-    return this.variableMap.getAllVariables().map((v) => v.getName());
+    return this.variableMap.getAllVariableNames();
   }
   /* End functions that are just pass-throughs to the variable map. */
   /**
@@ -613,20 +512,6 @@ export class Workspace {
   newBlock(prototypeName: string, opt_id?: string): Block {
     throw new Error(
       'The implementation of newBlock should be ' +
-        'monkey-patched in by blockly.ts',
-    );
-  }
-
-  /**
-   * Obtain a newly created comment.
-   *
-   * @param id Optional ID.  Use this ID if provided, otherwise create a new
-   *     ID.
-   * @returns The created comment.
-   */
-  newComment(id?: string): WorkspaceComment {
-    throw new Error(
-      'The implementation of newComment should be ' +
         'monkey-patched in by blockly.ts',
     );
   }
@@ -735,7 +620,7 @@ export class Workspace {
     if (!inputEvent) {
       return;
     }
-    const events = [inputEvent];
+    let events = [inputEvent];
     // Do another undo/redo if the next one is of the same group.
     while (
       inputStack.length &&
@@ -751,6 +636,7 @@ export class Workspace {
       const event = events[i];
       outputStack.push(event);
     }
+    events = eventUtils.filter(events, redo);
     eventUtils.setRecordUndo(false);
     try {
       for (let i = 0; i < events.length; i++) {
@@ -779,7 +665,7 @@ export class Workspace {
    * @param func Function to call.
    * @returns Obsolete return value, ignore.
    */
-  addChangeListener(func: (e: Abstract) => void): (e: Abstract) => void {
+  addChangeListener(func: (e: Abstract) => void): Function {
     this.listeners.push(func);
     return func;
   }
@@ -789,7 +675,7 @@ export class Workspace {
    *
    * @param func Function to stop calling.
    */
-  removeChangeListener(func: (e: Abstract) => void) {
+  removeChangeListener(func: Function) {
     arrayUtils.removeElem(this.listeners, func);
   }
 
@@ -848,6 +734,7 @@ export class Workspace {
    *
    * @param id ID of comment to find.
    * @returns The sought after comment, or null if not found.
+   * @internal
    */
   getCommentById(id: string): WorkspaceComment | null {
     return this.commentDB.get(id) ?? null;
@@ -877,10 +764,9 @@ export class Workspace {
    * These exist in the flyout but not in the workspace.
    *
    * @returns The potential variable map.
+   * @internal
    */
-  getPotentialVariableMap(): IVariableMap<
-    IVariableModel<IVariableState>
-  > | null {
+  getPotentialVariableMap(): VariableMap | null {
     return this.potentialVariableMap;
   }
 
@@ -890,8 +776,7 @@ export class Workspace {
    * @internal
    */
   createPotentialVariableMap() {
-    const VariableMap = this.getVariableMapClass();
-    this.potentialVariableMap = new VariableMap(this, true);
+    this.potentialVariableMap = new VariableMap(this);
   }
 
   /**
@@ -899,7 +784,7 @@ export class Workspace {
    *
    * @returns The variable map.
    */
-  getVariableMap(): IVariableMap<IVariableModel<IVariableState>> {
+  getVariableMap(): VariableMap {
     return this.variableMap;
   }
 
@@ -909,7 +794,7 @@ export class Workspace {
    * @param variableMap The variable map.
    * @internal
    */
-  setVariableMap(variableMap: IVariableMap<IVariableModel<IVariableState>>) {
+  setVariableMap(variableMap: VariableMap) {
     this.variableMap = variableMap;
   }
 
@@ -957,38 +842,5 @@ export class Workspace {
    */
   static getAll(): Workspace[] {
     return common.getAllWorkspaces();
-  }
-
-  protected getVariableMapClass(): new (
-    ...p1: any[]
-  ) => IVariableMap<IVariableModel<IVariableState>> {
-    const VariableMap = registry.getClassFromOptions(
-      registry.Type.VARIABLE_MAP,
-      this.options,
-      true,
-    );
-    if (!VariableMap) {
-      throw new Error('No variable map is registered.');
-    }
-    return VariableMap;
-  }
-
-  /**
-   * Returns whether or not this workspace is in readonly mode.
-   *
-   * @returns True if the workspace is readonly, otherwise false.
-   */
-  isReadOnly(): boolean {
-    return this.readOnly;
-  }
-
-  /**
-   * Sets whether or not this workspace is in readonly mode.
-   *
-   * @param readOnly True to make the workspace readonly, otherwise false.
-   */
-  setIsReadOnly(readOnly: boolean) {
-    this.readOnly = readOnly;
-    this.options.readOnly = readOnly;
   }
 }

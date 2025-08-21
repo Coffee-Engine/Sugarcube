@@ -6,23 +6,23 @@
 
 // Former goog.module ID: Blockly.Mutator
 
-import type {BlockSvg} from '../block_svg.js';
-import type {BlocklyOptions} from '../blockly_options.js';
-import {MiniWorkspaceBubble} from '../bubbles/mini_workspace_bubble.js';
 import type {Abstract} from '../events/events_abstract.js';
+import type {Block} from '../block.js';
 import {BlockChange} from '../events/events_block_change.js';
-import {isBlockChange, isBlockCreate} from '../events/predicates.js';
-import {EventType} from '../events/type.js';
-import * as eventUtils from '../events/utils.js';
-import type {IHasBubble} from '../interfaces/i_has_bubble.js';
-import * as renderManagement from '../render_management.js';
+import type {BlocklyOptions} from '../blockly_options.js';
+import type {BlockSvg} from '../block_svg.js';
+import type {Connection} from '../connection.js';
 import {Coordinate} from '../utils/coordinate.js';
 import * as dom from '../utils/dom.js';
+import * as eventUtils from '../events/utils.js';
+import type {IHasBubble} from '../interfaces/i_has_bubble.js';
+import {Icon} from './icon.js';
+import {MiniWorkspaceBubble} from '../bubbles/mini_workspace_bubble.js';
 import {Rect} from '../utils/rect.js';
 import {Size} from '../utils/size.js';
 import {Svg} from '../utils/svg.js';
 import type {WorkspaceSvg} from '../workspace_svg.js';
-import {Icon} from './icon.js';
+import * as deprecation from '../utils/deprecation.js';
 import {IconType} from './icon_types.js';
 
 /** The size of the mutator icon in workspace-scale units. */
@@ -118,7 +118,7 @@ export class MutatorIcon extends Icon implements IHasBubble {
       {'class': 'blocklyIconShape', 'r': '2.7', 'cx': '8', 'cy': '8'},
       this.svgRoot,
     );
-    dom.addClass(this.svgRoot!, 'blocklyMutatorIcon');
+    dom.addClass(this.svgRoot!, 'blockly-icon-mutator');
   }
 
   override dispose(): void {
@@ -136,7 +136,7 @@ export class MutatorIcon extends Icon implements IHasBubble {
 
   override applyColour(): void {
     super.applyColour();
-    this.miniWorkspaceBubble?.setColour(this.sourceBlock.getColour());
+    this.miniWorkspaceBubble?.setColour(this.sourceBlock.style.colourPrimary);
     this.miniWorkspaceBubble?.updateBlockStyles();
   }
 
@@ -165,10 +165,8 @@ export class MutatorIcon extends Icon implements IHasBubble {
     return !!this.miniWorkspaceBubble;
   }
 
-  async setBubbleVisible(visible: boolean): Promise<void> {
+  setBubbleVisible(visible: boolean): void {
     if (this.bubbleIsVisible() === visible) return;
-
-    await renderManagement.finishQueuedRenders();
 
     if (visible) {
       this.miniWorkspaceBubble = new MiniWorkspaceBubble(
@@ -195,17 +193,12 @@ export class MutatorIcon extends Icon implements IHasBubble {
     }
 
     eventUtils.fire(
-      new (eventUtils.get(EventType.BUBBLE_OPEN))(
+      new (eventUtils.get(eventUtils.BUBBLE_OPEN))(
         this.sourceBlock,
         visible,
         'mutator',
       ),
     );
-  }
-
-  /** See IHasBubble.getBubble. */
-  getBubble(): MiniWorkspaceBubble | null {
-    return this.miniWorkspaceBubble;
   }
 
   /** @returns the configuration the mini workspace should have. */
@@ -314,8 +307,9 @@ export class MutatorIcon extends Icon implements IHasBubble {
   static isIgnorableMutatorEvent(e: Abstract) {
     return (
       e.isUiEvent ||
-      isBlockCreate(e) ||
-      (isBlockChange(e) && e.element === 'disabled')
+      e.type === eventUtils.CREATE ||
+      (e.type === eventUtils.CHANGE &&
+        (e as BlockChange).element === 'disabled')
     );
   }
 
@@ -337,7 +331,7 @@ export class MutatorIcon extends Icon implements IHasBubble {
 
     if (oldExtraState !== newExtraState) {
       eventUtils.fire(
-        new (eventUtils.get(EventType.BLOCK_CHANGE))(
+        new (eventUtils.get(eventUtils.BLOCK_CHANGE))(
           this.sourceBlock,
           'mutation',
           null,
@@ -356,5 +350,41 @@ export class MutatorIcon extends Icon implements IHasBubble {
    */
   getWorkspace(): WorkspaceSvg | undefined {
     return this.miniWorkspaceBubble?.getWorkspace();
+  }
+
+  /**
+   * Reconnects the given connection to the mutated input on the given block.
+   *
+   * @deprecated Use connection.reconnect instead. To be removed in v11.
+   */
+  static reconnect(
+    connectionChild: Connection | null,
+    block: Block,
+    inputName: string,
+  ): boolean {
+    deprecation.warn(
+      'MutatorIcon.reconnect',
+      'v10',
+      'v11',
+      'connection.reconnect',
+    );
+    if (!connectionChild) return false;
+    return connectionChild.reconnect(block, inputName);
+  }
+
+  /**
+   * Returns the parent workspace of a workspace that is inside a mini workspace
+   * bubble, taking into account whether the workspace is a flyout.
+   *
+   * @deprecated Use workspace.getRootWorkspace. To be removed in v11.
+   */
+  static findParentWs(workspace: WorkspaceSvg): WorkspaceSvg | null {
+    deprecation.warn(
+      'MutatorIcon.findParentWs',
+      'v10',
+      'v11',
+      'workspace.getRootWorkspace',
+    );
+    return workspace.getRootWorkspace();
   }
 }

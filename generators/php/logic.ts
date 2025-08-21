@@ -11,8 +11,8 @@
 // Former goog.module ID: Blockly.PHP.logic
 
 import type {Block} from '../../core/block.js';
-import type {PhpGenerator} from './php_generator.js';
 import {Order} from './php_generator.js';
+import type {PhpGenerator} from './php_generator.js';
 
 export function controls_if(block: Block, generator: PhpGenerator) {
   // If/elseif/else condition.
@@ -46,9 +46,7 @@ export function controls_if(block: Block, generator: PhpGenerator) {
   } while (block.getInput('IF' + n));
 
   if (block.getInput('ELSE') || generator.STATEMENT_SUFFIX) {
-    branchCode = block.getInput('ELSE')
-      ? generator.statementToCode(block, 'ELSE')
-      : '';
+    branchCode = generator.statementToCode(block, 'ELSE');
     if (generator.STATEMENT_SUFFIX) {
       branchCode =
         generator.prefixLines(

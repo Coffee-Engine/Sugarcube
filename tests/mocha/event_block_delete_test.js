@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../node_modules/chai/chai.js';
 import {defineRowBlock} from './test_helpers/block_definitions.js';
 import {
   sharedTestSetup,
@@ -35,7 +34,7 @@ suite('Block Delete Event', function () {
       testBlock.dispose();
       this.clock.runAll();
 
-      assert.isFalse(spy.called);
+      chai.assert.isFalse(spy.called);
     });
   });
 
@@ -49,7 +48,7 @@ suite('Block Delete Event', function () {
       delete origEvent.oldXml; // xml fails deep equals for some reason.
       delete newEvent.oldXml; // xml fails deep equals for some reason.
 
-      assert.deepEqual(newEvent, origEvent);
+      chai.assert.deepEqual(newEvent, origEvent);
     });
   });
 });

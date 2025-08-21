@@ -5,8 +5,6 @@
  */
 
 import {ConnectionType} from '../../build/src/core/connection_type.js';
-import * as idGenerator from '../../build/src/core/utils/idgenerator.js';
-import {assert} from '../../node_modules/chai/chai.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
@@ -20,7 +18,7 @@ suite('Connection Database', function () {
     this.assertOrder = function () {
       const length = this.database.connections.length;
       for (let i = 1; i < length; i++) {
-        assert.isAtMost(
+        chai.assert.isAtMost(
           this.database.connections[i - 1].y,
           this.database.connections[i].y,
         );
@@ -32,7 +30,7 @@ suite('Connection Database', function () {
       };
       workspace.connectionDBList[type] = opt_database || this.database;
       const connection = new Blockly.RenderedConnection(
-        {id: idGenerator.getNextUniqueId(), workspace: workspace},
+        {workspace: workspace},
         type,
       );
       connection.x = x;
@@ -61,19 +59,24 @@ suite('Connection Database', function () {
     const y3b = {y: 3};
 
     this.database.addConnection(y2, 2);
-    assert.sameOrderedMembers(this.database.connections, [y2]);
+    chai.assert.sameOrderedMembers(this.database.connections, [y2]);
 
     this.database.addConnection(y4, 4);
-    assert.sameOrderedMembers(this.database.connections, [y2, y4]);
+    chai.assert.sameOrderedMembers(this.database.connections, [y2, y4]);
 
     this.database.addConnection(y1, 1);
-    assert.sameOrderedMembers(this.database.connections, [y1, y2, y4]);
+    chai.assert.sameOrderedMembers(this.database.connections, [y1, y2, y4]);
 
     this.database.addConnection(y3a, 3);
-    assert.sameOrderedMembers(this.database.connections, [y1, y2, y3a, y4]);
+    chai.assert.sameOrderedMembers(this.database.connections, [
+      y1,
+      y2,
+      y3a,
+      y4,
+    ]);
 
     this.database.addConnection(y3b, 3);
-    assert.sameOrderedMembers(this.database.connections, [
+    chai.assert.sameOrderedMembers(this.database.connections, [
       y1,
       y2,
       y3b,
@@ -96,7 +99,7 @@ suite('Connection Database', function () {
     this.database.addConnection(y3b, 3);
     this.database.addConnection(y3a, 3);
 
-    assert.sameOrderedMembers(this.database.connections, [
+    chai.assert.sameOrderedMembers(this.database.connections, [
       y1,
       y2,
       y3a,
@@ -106,7 +109,7 @@ suite('Connection Database', function () {
     ]);
 
     this.database.removeConnection(y2, 2);
-    assert.sameOrderedMembers(this.database.connections, [
+    chai.assert.sameOrderedMembers(this.database.connections, [
       y1,
       y3a,
       y3b,
@@ -115,19 +118,24 @@ suite('Connection Database', function () {
     ]);
 
     this.database.removeConnection(y4, 4);
-    assert.sameOrderedMembers(this.database.connections, [y1, y3a, y3b, y3c]);
+    chai.assert.sameOrderedMembers(this.database.connections, [
+      y1,
+      y3a,
+      y3b,
+      y3c,
+    ]);
 
     this.database.removeConnection(y1, 1);
-    assert.sameOrderedMembers(this.database.connections, [y3a, y3b, y3c]);
+    chai.assert.sameOrderedMembers(this.database.connections, [y3a, y3b, y3c]);
 
     this.database.removeConnection(y3a, 3);
-    assert.sameOrderedMembers(this.database.connections, [y3b, y3c]);
+    chai.assert.sameOrderedMembers(this.database.connections, [y3b, y3c]);
 
     this.database.removeConnection(y3c, 3);
-    assert.sameOrderedMembers(this.database.connections, [y3b]);
+    chai.assert.sameOrderedMembers(this.database.connections, [y3b]);
 
     this.database.removeConnection(y3b, 3);
-    assert.isEmpty(this.database.connections);
+    chai.assert.isEmpty(this.database.connections);
   });
   suite('Get Neighbors', function () {
     test('Empty Database', function () {
@@ -137,7 +145,7 @@ suite('Connection Database', function () {
         ConnectionType.NEXT_STATEMENT,
         new Blockly.ConnectionDB(),
       );
-      assert.isEmpty(this.database.getNeighbours(connection), 100);
+      chai.assert.isEmpty(this.database.getNeighbours(connection), 100);
     });
     test('Block At Top', function () {
       this.createSimpleTestConnections();
@@ -149,7 +157,7 @@ suite('Connection Database', function () {
         new Blockly.ConnectionDB(),
       );
       const neighbors = this.database.getNeighbours(checkConnection, 4);
-      assert.sameMembers(neighbors, this.database.connections.slice(0, 5));
+      chai.assert.sameMembers(neighbors, this.database.connections.slice(0, 5));
     });
     test('Block In Middle', function () {
       this.createSimpleTestConnections();
@@ -161,7 +169,7 @@ suite('Connection Database', function () {
         new Blockly.ConnectionDB(),
       );
       const neighbors = this.database.getNeighbours(checkConnection, 2);
-      assert.sameMembers(neighbors, this.database.connections.slice(2, 7));
+      chai.assert.sameMembers(neighbors, this.database.connections.slice(2, 7));
     });
     test('Block At End', function () {
       this.createSimpleTestConnections();
@@ -173,7 +181,10 @@ suite('Connection Database', function () {
         new Blockly.ConnectionDB(),
       );
       const neighbors = this.database.getNeighbours(checkConnection, 4);
-      assert.sameMembers(neighbors, this.database.connections.slice(5, 10));
+      chai.assert.sameMembers(
+        neighbors,
+        this.database.connections.slice(5, 10),
+      );
     });
     test('Out of Range X', function () {
       this.createSimpleTestConnections();
@@ -185,7 +196,7 @@ suite('Connection Database', function () {
         new Blockly.ConnectionDB(),
       );
       const neighbors = this.database.getNeighbours(checkConnection, 4);
-      assert.isEmpty(neighbors);
+      chai.assert.isEmpty(neighbors);
     });
     test('Out of Range Y', function () {
       this.createSimpleTestConnections();
@@ -197,7 +208,7 @@ suite('Connection Database', function () {
         new Blockly.ConnectionDB(),
       );
       const neighbors = this.database.getNeighbours(checkConnection, 4);
-      assert.isEmpty(neighbors);
+      chai.assert.isEmpty(neighbors);
     });
     test('Out of Range Diagonal', function () {
       this.createSimpleTestConnections();
@@ -209,7 +220,7 @@ suite('Connection Database', function () {
         new Blockly.ConnectionDB(),
       );
       const neighbors = this.database.getNeighbours(checkConnection, 2);
-      assert.isEmpty(neighbors);
+      chai.assert.isEmpty(neighbors);
     });
   });
   suite('Ordering', function () {
@@ -289,7 +300,7 @@ suite('Connection Database', function () {
         ConnectionType.NEXT_STATEMENT,
         new Blockly.ConnectionDB(),
       );
-      assert.isNull(
+      chai.assert.isNull(
         this.database.searchForClosest(checkConnection, 100, {x: 0, y: 0})
           .connection,
       );
@@ -308,7 +319,7 @@ suite('Connection Database', function () {
         ConnectionType.NEXT_STATEMENT,
         new Blockly.ConnectionDB(),
       );
-      assert.isNull(
+      chai.assert.isNull(
         this.database.searchForClosest(checkConnection, 50, {x: 0, y: 0})
           .connection,
       );
@@ -323,7 +334,7 @@ suite('Connection Database', function () {
         x: 0,
         y: 0,
       }).connection;
-      assert.equal(last, closest);
+      chai.assert.equal(last, closest);
     });
     test('Many in Range', function () {
       this.createSimpleTestConnections();
@@ -335,7 +346,7 @@ suite('Connection Database', function () {
         x: 0,
         y: 0,
       }).connection;
-      assert.equal(last, closest);
+      chai.assert.equal(last, closest);
     });
     test('No Y-Coord Priority', function () {
       const connection1 = this.createConnection(
@@ -357,7 +368,7 @@ suite('Connection Database', function () {
         x: 0,
         y: 0,
       }).connection;
-      assert.equal(connection2, closest);
+      chai.assert.equal(connection2, closest);
     });
   });
 });

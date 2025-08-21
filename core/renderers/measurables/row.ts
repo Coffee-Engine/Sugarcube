@@ -7,6 +7,7 @@
 // Former goog.module ID: Blockly.blockRendering.Row
 
 import type {ConstantProvider} from '../common/constants.js';
+
 import type {Measurable} from './base.js';
 import type {InRowSpacer} from './in_row_spacer.js';
 import type {InputConnection} from './input_connection.js';
@@ -127,7 +128,7 @@ export class Row {
     for (let i = this.elements.length - 1; i >= 0; i--) {
       const elem = this.elements[i];
       if (Types.isInput(elem)) {
-        return elem;
+        return elem as InputConnection;
       }
     }
     return null;
@@ -166,8 +167,8 @@ export class Row {
   getFirstSpacer(): InRowSpacer | null {
     for (let i = 0; i < this.elements.length; i++) {
       const elem = this.elements[i];
-      if (Types.isInRowSpacer(elem)) {
-        return elem;
+      if (Types.isSpacer(elem)) {
+        return elem as InRowSpacer;
       }
     }
     return null;
@@ -181,8 +182,8 @@ export class Row {
   getLastSpacer(): InRowSpacer | null {
     for (let i = this.elements.length - 1; i >= 0; i--) {
       const elem = this.elements[i];
-      if (Types.isInRowSpacer(elem)) {
-        return elem;
+      if (Types.isSpacer(elem)) {
+        return elem as InRowSpacer;
       }
     }
     return null;

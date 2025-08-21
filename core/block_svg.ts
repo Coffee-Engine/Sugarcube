@@ -17,7 +17,7 @@ import './events/events_selected.js';
 import {Block} from './block.js';
 import * as blockAnimations from './block_animations.js';
 import * as browserEvents from './browser_events.js';
-import {BlockCopyData, BlockPaster} from './clipboard/block_paster.js';
+import {CommentIcon} from './icons/comment_icon.js';
 import * as common from './common.js';
 import {config} from './config.js';
 import type {Connection} from './connection.js';
@@ -29,41 +29,39 @@ import {
   ContextMenuRegistry,
   LegacyContextMenuOption,
 } from './contextmenu_registry.js';
-import {BlockDragStrategy} from './dragging/block_drag_strategy.js';
 import type {BlockMove} from './events/events_block_move.js';
-import {EventType} from './events/type.js';
 import * as eventUtils from './events/utils.js';
+import type {Field} from './field.js';
 import {FieldLabel} from './field_label.js';
-import {getFocusManager} from './focus_manager.js';
-import {IconType} from './icons/icon_types.js';
-import {MutatorIcon} from './icons/mutator_icon.js';
-import {WarningIcon} from './icons/warning_icon.js';
 import type {Input} from './inputs/input.js';
+import type {IASTNodeLocationSvg} from './interfaces/i_ast_node_location_svg.js';
 import type {IBoundedElement} from './interfaces/i_bounded_element.js';
-import {IContextMenu} from './interfaces/i_contextmenu.js';
 import type {ICopyable} from './interfaces/i_copyable.js';
-import {IDeletable} from './interfaces/i_deletable.js';
-import type {IDragStrategy, IDraggable} from './interfaces/i_draggable.js';
-import type {IFocusableNode} from './interfaces/i_focusable_node.js';
-import type {IFocusableTree} from './interfaces/i_focusable_tree.js';
+import type {IDraggable} from './interfaces/i_draggable.js';
 import {IIcon} from './interfaces/i_icon.js';
 import * as internalConstants from './internal_constants.js';
+import {ASTNode} from './keyboard_nav/ast_node.js';
+import {TabNavigateCursor} from './keyboard_nav/tab_navigate_cursor.js';
+import {MarkerManager} from './marker_manager.js';
 import {Msg} from './msg.js';
-import * as renderManagement from './render_management.js';
+import {MutatorIcon} from './icons/mutator_icon.js';
 import {RenderedConnection} from './rendered_connection.js';
 import type {IPathObject} from './renderers/common/i_path_object.js';
 import * as blocks from './serialization/blocks.js';
 import type {BlockStyle} from './theme.js';
 import * as Tooltip from './tooltip.js';
-import {idGenerator} from './utils.js';
 import {Coordinate} from './utils/coordinate.js';
 import * as dom from './utils/dom.js';
 import {Rect} from './utils/rect.js';
 import {Svg} from './utils/svg.js';
 import * as svgMath from './utils/svg_math.js';
-import {FlyoutItemInfo} from './utils/toolbox.js';
+import {WarningIcon} from './icons/warning_icon.js';
 import type {Workspace} from './workspace.js';
 import type {WorkspaceSvg} from './workspace_svg.js';
+import * as renderManagement from './render_management.js';
+import * as deprecation from './utils/deprecation.js';
+import {IconType} from './icons/icon_types.js';
+import {BlockCopyData, BlockPaster} from './clipboard/block_paster.js';
 
 /**
  * Class for a block's SVG representation.
@@ -72,12 +70,10 @@ import type {WorkspaceSvg} from './workspace_svg.js';
 export class BlockSvg
   extends Block
   implements
+    IASTNodeLocationSvg,
     IBoundedElement,
-    IContextMenu,
     ICopyable<BlockCopyData>,
-    IDraggable,
-    IDeletable,
-    IFocusableNode
+    IDraggable
 {
   /**
    * Constant for identifying rows that are to be rendered inline.
@@ -93,25 +89,7 @@ export class BlockSvg
   static readonly COLLAPSED_WARNING_ID = 'TEMP_COLLAPSED_WARNING_';
   override decompose?: (p1: Workspace) => BlockSvg;
   // override compose?: ((p1: BlockSvg) => void)|null;
-
-  /**
-   * An optional method which saves a record of blocks connected to
-   * this block so they can be later restored after this block is
-   * recoomposed (reconfigured).  Typically records the connected
-   * blocks on properties on blocks in the mutator flyout, so that
-   * rearranging those component blocks will automatically rearrange
-   * the corresponding connected blocks on this block after this block
-   * is recomposed.
-   *
-   * To keep the saved connection information up-to-date, MutatorIcon
-   * arranges for an event listener to call this method any time the
-   * mutator flyout is open and a change occurs on this block's
-   * workspace.
-   *
-   * @param rootBlock The root block in the mutator flyout.
-   */
-  saveConnections?: (rootBlock: BlockSvg) => void;
-
+  saveConnections?: (p1: BlockSvg) => void;
   customContextMenu?: (
     p1: Array<ContextMenuOption | LegacyContextMenuOption>,
   ) => void;
@@ -129,14 +107,6 @@ export class BlockSvg
   width = 0;
 
   /**
-   * Width of this block, not including any connected value blocks.
-   * Width is in workspace units.
-   *
-   * @internal
-   */
-  childlessWidth = 0;
-
-  /**
    * Map from IDs for warnings text to PIDs of functions to apply them.
    * Used to be able to maintain multiple warnings.
    */
@@ -145,15 +115,28 @@ export class BlockSvg
   /** Block's mutator icon (if any). */
   mutator: MutatorIcon | null = null;
 
-  private svgGroup: SVGGElement;
+  /**
+   * Block's warning icon (if any).
+   *
+   * @deprecated Use `setWarningText` to modify warnings on this block.
+   */
+  warning: WarningIcon | null = null;
+
+  private svgGroup_: SVGGElement;
   style: BlockStyle;
   /** @internal */
   pathObject: IPathObject;
-
-  /** Is this block a BlockSVG? */
-  override readonly rendered = true;
-
+  override rendered = false;
   private visuallyDisabled = false;
+
+  /**
+   * Is this block currently rendering? Used to stop recursive render calls
+   * from actually triggering a re-render.
+   */
+  private renderIsInProgress_ = false;
+
+  /** Whether mousedown events have been bound yet. */
+  private eventsInit_ = false;
 
   override workspace: WorkspaceSvg;
   // TODO(b/109816955): remove '!', see go/strict-prop-init-fix.
@@ -164,6 +147,12 @@ export class BlockSvg
   override previousConnection!: RenderedConnection;
 
   private translation = '';
+
+  /**
+   * The ID of the setTimeout callback for bumping neighbours, or 0 if no bump
+   * is currently scheduled.
+   */
+  private bumpNeighboursPid = 0;
 
   /** Whether this block is currently being dragged. */
   private dragging = false;
@@ -177,8 +166,6 @@ export class BlockSvg
    */
   relativeCoords = new Coordinate(0, 0);
 
-  private dragStrategy: IDragStrategy = new BlockDragStrategy(this);
-
   /**
    * @param workspace The block's workspace.
    * @param prototypeName Name of the language object containing type-specific
@@ -188,32 +175,23 @@ export class BlockSvg
    */
   constructor(workspace: WorkspaceSvg, prototypeName: string, opt_id?: string) {
     super(workspace, prototypeName, opt_id);
-    if (!workspace.rendered) {
-      throw TypeError('Cannot create a rendered block in a headless workspace');
-    }
     this.workspace = workspace;
-    this.svgGroup = dom.createSvgElement(Svg.G, {});
+    this.svgGroup_ = dom.createSvgElement(Svg.G, {});
 
-    if (prototypeName) {
-      dom.addClass(this.svgGroup, prototypeName);
-    }
     /** A block style object. */
     this.style = workspace.getRenderer().getConstants().getBlockStyle(null);
 
     /** The renderer's path object. */
     this.pathObject = workspace
       .getRenderer()
-      .makePathObject(this.svgGroup, this.style);
+      .makePathObject(this.svgGroup_, this.style);
 
     const svgPath = this.pathObject.svgPath;
     (svgPath as any).tooltip = this;
     Tooltip.bindMouseEvents(svgPath);
 
     // Expose this block's ID on its top-level SVG group.
-    this.svgGroup.setAttribute('data-id', this.id);
-
-    // The page-wide unique ID of this Block used for focusing.
-    svgPath.id = idGenerator.getNextUniqueId();
+    this.svgGroup_.setAttribute('data-id', this.id);
 
     this.doInit_();
   }
@@ -223,8 +201,10 @@ export class BlockSvg
    * May be called more than once.
    */
   initSvg() {
-    if (this.initialized) return;
-    for (const input of this.inputList) {
+    if (!this.workspace.rendered) {
+      throw TypeError('Workspace is headless.');
+    }
+    for (let i = 0, input; (input = this.inputList[i]); i++) {
       input.init();
     }
     for (const icon of this.getIcons()) {
@@ -232,16 +212,21 @@ export class BlockSvg
       icon.updateEditable();
     }
     this.applyColour();
-    this.pathObject.updateMovable(this.isMovable() || this.isInFlyout);
+    this.pathObject.updateMovable(this.isMovable());
     const svg = this.getSvgRoot();
-    if (svg) {
-      browserEvents.conditionalBind(svg, 'pointerdown', this, this.onMouseDown);
+    if (!this.workspace.options.readOnly && !this.eventsInit_ && svg) {
+      browserEvents.conditionalBind(
+        svg,
+        'pointerdown',
+        this,
+        this.onMouseDown_,
+      );
     }
+    this.eventsInit_ = true;
 
     if (!svg.parentNode) {
       this.workspace.getCanvas().appendChild(svg);
     }
-    this.initialized = true;
   }
 
   /**
@@ -249,7 +234,7 @@ export class BlockSvg
    *
    * @returns #RRGGBB string.
    */
-  getColourSecondary(): string {
+  getColourSecondary(): string | undefined {
     return this.style.colourSecondary;
   }
 
@@ -258,20 +243,61 @@ export class BlockSvg
    *
    * @returns #RRGGBB string.
    */
-  getColourTertiary(): string {
+  getColourTertiary(): string | undefined {
     return this.style.colourTertiary;
   }
 
-  /** Selects this block. Highlights the block visually. */
+  /**
+   * Selects this block. Highlights the block visually and fires a select event
+   * if the block is not already selected.
+   */
   select() {
+    if (this.isShadow() && this.getParent()) {
+      // Shadow blocks should not be selected.
+      this.getParent()!.select();
+      return;
+    }
+    if (common.getSelected() === this) {
+      return;
+    }
+    let oldId = null;
+    if (common.getSelected()) {
+      oldId = common.getSelected()!.id;
+      // Unselect any previously selected block.
+      eventUtils.disable();
+      try {
+        common.getSelected()!.unselect();
+      } finally {
+        eventUtils.enable();
+      }
+    }
+    const event = new (eventUtils.get(eventUtils.SELECTED))(
+      oldId,
+      this.id,
+      this.workspace.id,
+    );
+    eventUtils.fire(event);
+    common.setSelected(this);
     this.addSelect();
-    common.fireSelectedEvent(this);
   }
 
-  /** Unselects this block. Unhighlights the block visually. */
+  /**
+   * Unselects this block. Unhighlights the block and fires a select (false)
+   * event if the block is currently selected.
+   */
   unselect() {
+    if (common.getSelected() !== this) {
+      return;
+    }
+    const event = new (eventUtils.get(eventUtils.SELECTED))(
+      this.id,
+      null,
+      this.workspace.id,
+    );
+    event.workspaceId = this.workspace.id;
+    eventUtils.fire(event);
+    common.setSelected(null);
     this.removeSelect();
-    common.fireSelectedEvent(null);
   }
 
   /**
@@ -299,44 +325,18 @@ export class BlockSvg
     }
 
     const oldXY = this.getRelativeToSurfaceXY();
-    const focusedNode = getFocusManager().getFocusedNode();
-    const restoreFocus = this.getSvgRoot().contains(
-      focusedNode?.getFocusableElement() ?? null,
-    );
     if (newParent) {
       (newParent as BlockSvg).getSvgRoot().appendChild(svgRoot);
-      // appendChild() clears focus state, so re-focus the previously focused
-      // node in case it was this block and would otherwise lose its focus. Once
-      // Element.moveBefore() has better browser support, it should be used
-      // instead.
-      if (restoreFocus && focusedNode) {
-        getFocusManager().focusNode(focusedNode);
-      }
     } else if (oldParent) {
       // If we are losing a parent, we want to move our DOM element to the
-      // root of the workspace.  Try to insert it before any top-level
-      // block being dragged, but note that blocks can have the
-      // blocklyDragging class even if they're not top blocks (especially
-      // at start and end of a drag).
-      const draggingBlockElement = this.workspace
+      // root of the workspace.
+      const draggingBlock = this.workspace
         .getCanvas()
         .querySelector('.blocklyDragging');
-      const draggingParentElement = draggingBlockElement?.parentElement as
-        | SVGElement
-        | null
-        | undefined;
-      const canvas = this.workspace.getCanvas();
-      if (draggingParentElement === canvas) {
-        canvas.insertBefore(svgRoot, draggingBlockElement);
+      if (draggingBlock) {
+        this.workspace.getCanvas().insertBefore(svgRoot, draggingBlock);
       } else {
-        canvas.appendChild(svgRoot);
-        // appendChild() clears focus state, so re-focus the previously focused
-        // node in case it was this block and would otherwise lose its focus. Once
-        // Element.moveBefore() has better browser support, it should be used
-        // instead.
-        if (restoreFocus && focusedNode) {
-          getFocusManager().focusNode(focusedNode);
-        }
+        this.workspace.getCanvas().appendChild(svgRoot);
       }
       this.translate(oldXY.x, oldXY.y);
     }
@@ -390,8 +390,8 @@ export class BlockSvg
     const eventsEnabled = eventUtils.isEnabled();
     let event: BlockMove | null = null;
     if (eventsEnabled) {
-      event = new (eventUtils.get(EventType.BLOCK_MOVE)!)(this) as BlockMove;
-      if (reason) event.setReason(reason);
+      event = new (eventUtils.get(eventUtils.BLOCK_MOVE)!)(this) as BlockMove;
+      reason && event.setReason(reason);
     }
 
     const delta = new Coordinate(dx, dy);
@@ -455,15 +455,34 @@ export class BlockSvg
 
   /** Snap this block to the nearest grid point. */
   snapToGrid() {
-    if (this.isDeadOrDying()) return;
-    if (this.getParent()) return;
-    if (this.isInFlyout) return;
+    if (this.isDeadOrDying()) {
+      return; // Deleted block.
+    }
+    if (this.workspace.isDragging()) {
+      return; // Don't bump blocks during a drag.
+    }
+
+    if (this.getParent()) {
+      return; // Only snap top-level blocks.
+    }
+    if (this.isInFlyout) {
+      return; // Don't move blocks around in a flyout.
+    }
     const grid = this.workspace.getGrid();
-    if (!grid?.shouldSnap()) return;
-    const currentXY = this.getRelativeToSurfaceXY();
-    const alignedXY = grid.alignXY(currentXY);
-    if (alignedXY !== currentXY) {
-      this.moveTo(alignedXY, ['snap']);
+    if (!grid || !grid.shouldSnap()) {
+      return; // Config says no snapping.
+    }
+    const spacing = grid.getSpacing();
+    const half = spacing / 2;
+    const xy = this.getRelativeToSurfaceXY();
+    const dx = Math.round(
+      Math.round((xy.x - half) / spacing) * spacing + half - xy.x,
+    );
+    const dy = Math.round(
+      Math.round((xy.y - half) / spacing) * spacing + half - xy.y,
+    );
+    if (dx || dy) {
+      this.moveBy(dx, dy, ['snap']);
     }
   }
 
@@ -475,28 +494,8 @@ export class BlockSvg
    * @returns Object with coordinates of the bounding box.
    */
   getBoundingRectangle(): Rect {
-    return this.getBoundingRectangleWithDimensions(this.getHeightWidth());
-  }
-
-  /**
-   * Returns the coordinates of a bounding box describing the dimensions of this
-   * block alone.
-   * Coordinate system: workspace coordinates.
-   *
-   * @returns Object with coordinates of the bounding box.
-   */
-  getBoundingRectangleWithoutChildren(): Rect {
-    return this.getBoundingRectangleWithDimensions({
-      height: this.height,
-      width: this.childlessWidth,
-    });
-  }
-
-  private getBoundingRectangleWithDimensions(blockBounds: {
-    height: number;
-    width: number;
-  }) {
     const blockXY = this.getRelativeToSurfaceXY();
+    const blockBounds = this.getHeightWidth();
     let left;
     let right;
     if (this.RTL) {
@@ -530,29 +529,14 @@ export class BlockSvg
       return;
     }
     super.setCollapsed(collapsed);
-    this.updateCollapsed();
-  }
-
-  /**
-   * Traverses child blocks to see if any of them have a warning.
-   *
-   * @returns true if any child has a warning, false otherwise.
-   */
-  private childHasWarning(): boolean {
-    const children = this.getChildren(false);
-    for (const child of children) {
-      if (child.getIcon(WarningIcon.TYPE) || child.childHasWarning()) {
-        return true;
-      }
-    }
-    return false;
+    this.updateCollapsed_();
   }
 
   /**
    * Makes sure that when the block is collapsed, it is rendered correctly
    * for that state.
    */
-  private updateCollapsed() {
+  private updateCollapsed_() {
     const collapsed = this.isCollapsed();
     const collapsedInputName = constants.COLLAPSED_INPUT_NAME;
     const collapsedFieldName = constants.COLLAPSED_FIELD_NAME;
@@ -570,17 +554,7 @@ export class BlockSvg
     if (!collapsed) {
       this.updateDisabled();
       this.removeInput(collapsedInputName);
-      dom.removeClass(this.svgGroup, 'blocklyCollapsed');
-      this.setWarningText(null, BlockSvg.COLLAPSED_WARNING_ID);
       return;
-    }
-
-    dom.addClass(this.svgGroup, 'blocklyCollapsed');
-    if (this.childHasWarning()) {
-      this.setWarningText(
-        Msg['COLLAPSED_WARNINGS_WARNING'],
-        BlockSvg.COLLAPSED_WARNING_ID,
-      );
     }
 
     const text = this.toString(internalConstants.COLLAPSE_CHARS);
@@ -596,13 +570,40 @@ export class BlockSvg
   }
 
   /**
+   * Open the next (or previous) FieldTextInput.
+   *
+   * @param start Current field.
+   * @param forward If true go forward, otherwise backward.
+   */
+  tab(start: Field, forward: boolean) {
+    const tabCursor = new TabNavigateCursor();
+    tabCursor.setCurNode(ASTNode.createFieldNode(start)!);
+    const currentNode = tabCursor.getCurNode();
+
+    if (forward) {
+      tabCursor.next();
+    } else {
+      tabCursor.prev();
+    }
+
+    const nextNode = tabCursor.getCurNode();
+    if (nextNode && nextNode !== currentNode) {
+      const nextField = nextNode.getLocation() as Field;
+      nextField.showEditor();
+
+      // Also move the cursor if we're in keyboard nav mode.
+      if (this.workspace.keyboardAccessibilityMode) {
+        this.workspace.getCursor()!.setCurNode(nextNode);
+      }
+    }
+  }
+
+  /**
    * Handle a pointerdown on an SVG block.
    *
    * @param e Pointer down event.
    */
-  private onMouseDown(e: PointerEvent) {
-    if (this.workspace.isReadOnly()) return;
-
+  private onMouseDown_(e: PointerEvent) {
     const gesture = this.workspace.getGesture(e);
     if (gesture) {
       gesture.handleBlockStart(e, this);
@@ -627,15 +628,15 @@ export class BlockSvg
    *
    * @returns Context menu options or null if no menu.
    */
-  protected generateContextMenu(
-    e: Event,
-  ): Array<ContextMenuOption | LegacyContextMenuOption> | null {
-    if (this.workspace.isReadOnly() || !this.contextMenu) {
+  protected generateContextMenu(): Array<
+    ContextMenuOption | LegacyContextMenuOption
+  > | null {
+    if (this.workspace.options.readOnly || !this.contextMenu) {
       return null;
     }
     const menuOptions = ContextMenuRegistry.registry.getContextMenuOptions(
-      {block: this, focusedNode: this},
-      e,
+      ContextMenuRegistry.ScopeType.BLOCK,
+      {block: this},
     );
 
     // Allow the block to add or modify menuOptions.
@@ -647,56 +648,16 @@ export class BlockSvg
   }
 
   /**
-   * Gets the location in which to show the context menu for this block.
-   * Use the location of a click if the block was clicked, or a location
-   * based on the block's fields otherwise.
-   */
-  protected calculateContextMenuLocation(e: Event): Coordinate {
-    // Open the menu where the user clicked, if they clicked
-    if (e instanceof PointerEvent) {
-      return new Coordinate(e.clientX, e.clientY);
-    }
-
-    // Otherwise, calculate a location.
-    // Get the location of the top-left corner of the block in
-    // screen coordinates.
-    const blockCoords = svgMath.wsToScreenCoordinates(
-      this.workspace,
-      this.getRelativeToSurfaceXY(),
-    );
-
-    // Prefer a y position below the first field in the block.
-    const fieldBoundingClientRect = this.inputList
-      .filter((input) => input.isVisible())
-      .flatMap((input) => input.fieldRow)
-      .find((f) => f.isVisible())
-      ?.getSvgRoot()
-      ?.getBoundingClientRect();
-
-    const y =
-      fieldBoundingClientRect && fieldBoundingClientRect.height
-        ? fieldBoundingClientRect.y + fieldBoundingClientRect.height
-        : blockCoords.y + this.height;
-
-    return new Coordinate(
-      this.RTL ? blockCoords.x - 5 : blockCoords.x + 5,
-      y + 5,
-    );
-  }
-
-  /**
    * Show the context menu for this block.
    *
    * @param e Mouse event.
    * @internal
    */
   showContextMenu(e: Event) {
-    const menuOptions = this.generateContextMenu(e);
-
-    const location = this.calculateContextMenuLocation(e);
+    const menuOptions = this.generateContextMenu();
 
     if (menuOptions && menuOptions.length) {
-      ContextMenu.show(e, menuOptions, this.RTL, this.workspace, location);
+      ContextMenu.show(e, menuOptions, this.RTL);
       ContextMenu.setCurrentBlock(this);
     }
   }
@@ -709,6 +670,12 @@ export class BlockSvg
    * @internal
    */
   updateComponentLocations(blockOrigin: Coordinate) {
+    if (!this.rendered) {
+      // Rendering is required to lay out the blocks.
+      // This is probably an invisible block attached to a collapsed block.
+      return;
+    }
+
     if (!this.dragging) this.updateConnectionLocations(blockOrigin);
     this.updateIconLocations(blockOrigin);
     this.updateFieldLocations(blockOrigin);
@@ -741,24 +708,6 @@ export class BlockSvg
   }
 
   /**
-   * Add a CSS class to the SVG group of this block.
-   *
-   * @param className
-   */
-  addClass(className: string) {
-    dom.addClass(this.svgGroup, className);
-  }
-
-  /**
-   * Remove a CSS class from the SVG group of this block.
-   *
-   * @param className
-   */
-  removeClass(className: string) {
-    dom.removeClass(this.svgGroup, className);
-  }
-
-  /**
    * Recursively adds or removes the dragging class to this node and its
    * children.
    *
@@ -770,10 +719,10 @@ export class BlockSvg
     if (adding) {
       this.translation = '';
       common.draggingConnections.push(...this.getConnections_(true));
-      this.addClass('blocklyDragging');
+      dom.addClass(this.svgGroup_, 'blocklyDragging');
     } else {
       common.draggingConnections.length = 0;
-      this.removeClass('blocklyDragging');
+      dom.removeClass(this.svgGroup_, 'blocklyDragging');
     }
     // Recurse through all blocks attached under this one.
     for (let i = 0; i < this.childBlocks_.length; i++) {
@@ -798,13 +747,6 @@ export class BlockSvg
    */
   override setEditable(editable: boolean) {
     super.setEditable(editable);
-
-    if (editable) {
-      dom.removeClass(this.svgGroup, 'blocklyNotEditable');
-    } else {
-      dom.addClass(this.svgGroup, 'blocklyNotEditable');
-    }
-
     const icons = this.getIcons();
     for (let i = 0; i < icons.length; i++) {
       icons[i].updateEditable();
@@ -850,7 +792,7 @@ export class BlockSvg
    * @returns The root SVG node (probably a group).
    */
   getSvgRoot(): SVGGElement {
-    return this.svgGroup;
+    return this.svgGroup_;
   }
 
   /**
@@ -862,49 +804,18 @@ export class BlockSvg
    * @param animate If true, show a disposal animation and sound.
    */
   override dispose(healStack?: boolean, animate?: boolean) {
-    this.disposing = true;
+    if (this.isDeadOrDying()) return;
 
     Tooltip.dispose();
     ContextMenu.hide();
 
-    // If this block (or a descendant) was focused, focus its parent or
-    // workspace instead.
-    const focusManager = getFocusManager();
-    if (
-      this.getSvgRoot().contains(
-        focusManager.getFocusedNode()?.getFocusableElement() ?? null,
-      )
-    ) {
-      let parent: BlockSvg | undefined | null = this.getParent();
-      if (!parent) {
-        // In some cases, blocks are disconnected from their parents before
-        // being deleted. Attempt to infer if there was a parent by checking
-        // for a connection within a radius of 0. Even if this wasn't a parent,
-        // it must be adjacent to this block and so is as good an option as any
-        // to focus after deleting.
-        const connection = this.outputConnection ?? this.previousConnection;
-        if (connection) {
-          const targetConnection = connection.closest(
-            0,
-            new Coordinate(0, 0),
-          ).connection;
-          parent = targetConnection?.getSourceBlock();
-        }
-      }
-      if (parent) {
-        focusManager.focusNode(parent);
-      } else {
-        setTimeout(() => focusManager.focusTree(this.workspace), 0);
-      }
-    }
-
-    if (animate) {
+    if (animate && this.rendered) {
       this.unplug(healStack);
       blockAnimations.disposeUiEffect(this);
     }
 
     super.dispose(!!healStack);
-    dom.removeNode(this.svgGroup);
+    dom.removeNode(this.svgGroup_);
   }
 
   /**
@@ -912,10 +823,13 @@ export class BlockSvg
    * E.g. does trigger UI effects, remove nodes, etc.
    */
   override disposeInternal() {
-    this.disposing = true;
+    if (this.isDeadOrDying()) return;
     super.disposeInternal();
 
-    if (getFocusManager().getFocusedNode() === this) {
+    this.rendered = false;
+
+    if (common.getSelected() === this) {
+      this.unselect();
       this.workspace.cancelCurrentGesture();
     }
 
@@ -973,15 +887,17 @@ export class BlockSvg
    * @internal
    */
   applyColour() {
-    this.pathObject.applyColour?.(this);
+    this.pathObject.applyColour(this);
 
     const icons = this.getIcons();
     for (let i = 0; i < icons.length; i++) {
       icons[i].applyColour();
     }
 
-    for (const field of this.getFields()) {
-      field.applyColour();
+    for (let x = 0, input; (input = this.inputList[x]); x++) {
+      for (let y = 0, field; (field = input.fieldRow[y]); y++) {
+        field.applyColour();
+      }
     }
   }
 
@@ -1004,6 +920,18 @@ export class BlockSvg
     for (const child of this.getChildren(false)) {
       child.updateDisabled();
     }
+  }
+
+  /**
+   * Get the comment icon attached to this block, or null if the block has no
+   * comment.
+   *
+   * @returns The comment icon attached to this block, or null.
+   * @deprecated Use getIcon. To be remove in v11.
+   */
+  getCommentIcon(): CommentIcon | null {
+    deprecation.warn('getCommentIcon', 'v10', 'v11', 'getIcon');
+    return (this.getIcon(CommentIcon.TYPE) ?? null) as CommentIcon | null;
   }
 
   /**
@@ -1093,12 +1021,17 @@ export class BlockSvg
   override addIcon<T extends IIcon>(icon: T): T {
     super.addIcon(icon);
 
+    if (icon instanceof WarningIcon) this.warning = icon;
     if (icon instanceof MutatorIcon) this.mutator = icon;
 
-    icon.initView(this.createIconPointerDownListener(icon));
-    icon.applyColour();
-    icon.updateEditable();
-    this.queueRender();
+    if (this.rendered) {
+      icon.initView(this.createIconPointerDownListener(icon));
+      icon.applyColour();
+      icon.updateEditable();
+      this.queueRender();
+      renderManagement.triggerQueuedRenders();
+      this.bumpNeighbours();
+    }
 
     return icon;
   }
@@ -1120,46 +1053,28 @@ export class BlockSvg
   override removeIcon(type: IconType<IIcon>): boolean {
     const removed = super.removeIcon(type);
 
+    if (type.equals(WarningIcon.TYPE)) this.warning = null;
     if (type.equals(MutatorIcon.TYPE)) this.mutator = null;
 
-    this.queueRender();
-
+    if (this.rendered) {
+      this.queueRender();
+      renderManagement.triggerQueuedRenders();
+      this.bumpNeighbours();
+    }
     return removed;
   }
 
   /**
-   * Add or remove a reason why the block might be disabled. If a block has
-   * any reasons to be disabled, then the block itself will be considered
-   * disabled. A block could be disabled for multiple independent reasons
-   * simultaneously, such as when the user manually disables it, or the block
-   * is invalid.
+   * Set whether the block is enabled or not.
    *
-   * @param disabled If true, then the block should be considered disabled for
-   *     at least the provided reason, otherwise the block is no longer disabled
-   *     for that reason.
-   * @param reason A language-neutral identifier for a reason why the block
-   *     could be disabled. Call this method again with the same identifier to
-   *     update whether the block is currently disabled for this reason.
+   * @param enabled True if enabled.
    */
-  override setDisabledReason(disabled: boolean, reason: string): void {
-    const wasEnabled = this.isEnabled();
-    super.setDisabledReason(disabled, reason);
-    if (this.isEnabled() !== wasEnabled && !this.getInheritedDisabled()) {
-      this.updateDisabled();
-    }
-  }
-
-  /**
-   * Add blocklyNotDeletable class when block is not deletable
-   * Or remove class when block is deletable
-   */
-  override setDeletable(deletable: boolean) {
-    super.setDeletable(deletable);
-
-    if (deletable) {
-      dom.removeClass(this.svgGroup, 'blocklyNotDeletable');
-    } else {
-      dom.addClass(this.svgGroup, 'blocklyNotDeletable');
+  override setEnabled(enabled: boolean) {
+    if (this.isEnabled() !== enabled) {
+      super.setEnabled(enabled);
+      if (this.rendered && !this.getInheritedDisabled()) {
+        this.updateDisabled();
+      }
     }
   }
 
@@ -1170,6 +1085,9 @@ export class BlockSvg
    * @param highlighted True if highlighted.
    */
   setHighlighted(highlighted: boolean) {
+    if (!this.rendered) {
+      return;
+    }
     this.pathObject.updateHighlighted(highlighted);
   }
 
@@ -1227,7 +1145,7 @@ export class BlockSvg
       .getConstants()
       .getBlockStyleForColour(this.colour_);
 
-    this.pathObject.setStyle?.(styleObj.style);
+    this.pathObject.setStyle(styleObj.style);
     this.style = styleObj.style;
     this.styleName_ = styleObj.name;
 
@@ -1245,34 +1163,19 @@ export class BlockSvg
       .getRenderer()
       .getConstants()
       .getBlockStyle(blockStyleName);
-
-    if (this.styleName_) {
-      dom.removeClass(this.svgGroup, this.styleName_);
-    }
+    this.styleName_ = blockStyleName;
 
     if (blockStyle) {
       this.hat = blockStyle.hat;
-      this.pathObject.setStyle?.(blockStyle);
+      this.pathObject.setStyle(blockStyle);
       // Set colour to match Block.
       this.colour_ = blockStyle.colourPrimary;
       this.style = blockStyle;
 
       this.applyColour();
-
-      dom.addClass(this.svgGroup, blockStyleName);
-      this.styleName_ = blockStyleName;
     } else {
       throw Error('Invalid style name: ' + blockStyleName);
     }
-  }
-
-  /**
-   * Returns the BlockStyle object used to style this block.
-   *
-   * @returns This block's style object.
-   */
-  getStyle(): BlockStyle {
-    return this.style;
   }
 
   /**
@@ -1280,14 +1183,12 @@ export class BlockSvg
    * <g> tags do not respect z-index so SVG renders them in the
    * order that they are in the DOM.  By placing this block first within the
    * block group's <g>, it will render on top of any other blocks.
-   * Use sparingly, this method is expensive because it reorders the DOM
-   * nodes.
    *
-   * @param blockOnly True to only move this block to the front without
+   * @param blockOnly: True to only move this block to the front without
    *     adjusting its parents.
+   * @internal
    */
   bringToFront(blockOnly = false) {
-    const previouslyFocused = getFocusManager().getFocusedNode();
     /* eslint-disable-next-line @typescript-eslint/no-this-alias */
     let block: this | null = this;
     if (block.isDeadOrDying()) {
@@ -1304,13 +1205,6 @@ export class BlockSvg
       if (blockOnly) break;
       block = block.getParent();
     } while (block);
-    if (previouslyFocused) {
-      // Bringing a block to the front of the stack doesn't fundamentally change
-      // the logical structure of the page, but it does change element ordering
-      // which can take automatically take away focus from a node. Ensure focus
-      // is restored to avoid a discontinuity.
-      getFocusManager().focusNode(previouslyFocused);
-    }
   }
 
   /**
@@ -1325,7 +1219,11 @@ export class BlockSvg
     opt_check?: string | string[] | null,
   ) {
     super.setPreviousStatement(newBoolean, opt_check);
-    this.queueRender();
+
+    if (this.rendered) {
+      this.queueRender();
+      this.bumpNeighbours();
+    }
   }
 
   /**
@@ -1340,7 +1238,11 @@ export class BlockSvg
     opt_check?: string | string[] | null,
   ) {
     super.setNextStatement(newBoolean, opt_check);
-    this.queueRender();
+
+    if (this.rendered) {
+      this.queueRender();
+      this.bumpNeighbours();
+    }
   }
 
   /**
@@ -1355,7 +1257,11 @@ export class BlockSvg
     opt_check?: string | string[] | null,
   ) {
     super.setOutput(newBoolean, opt_check);
-    this.queueRender();
+
+    if (this.rendered) {
+      this.queueRender();
+      this.bumpNeighbours();
+    }
   }
 
   /**
@@ -1365,7 +1271,11 @@ export class BlockSvg
    */
   override setInputsInline(newBoolean: boolean) {
     super.setInputsInline(newBoolean);
-    this.queueRender();
+
+    if (this.rendered) {
+      this.queueRender();
+      this.bumpNeighbours();
+    }
   }
 
   /**
@@ -1379,7 +1289,13 @@ export class BlockSvg
    */
   override removeInput(name: string, opt_quiet?: boolean): boolean {
     const removed = super.removeInput(name, opt_quiet);
-    this.queueRender();
+
+    if (this.rendered) {
+      this.queueRender();
+      // Removing an input will cause the block to change shape.
+      this.bumpNeighbours();
+    }
+
     return removed;
   }
 
@@ -1391,13 +1307,23 @@ export class BlockSvg
    */
   override moveNumberedInputBefore(inputIndex: number, refIndex: number) {
     super.moveNumberedInputBefore(inputIndex, refIndex);
-    this.queueRender();
+
+    if (this.rendered) {
+      this.queueRender();
+      // Moving an input will cause the block to change shape.
+      this.bumpNeighbours();
+    }
   }
 
   /** @override */
   override appendInput(input: Input): Input {
     super.appendInput(input);
-    this.queueRender();
+
+    if (this.rendered) {
+      this.queueRender();
+      // Adding an input will cause the block to change shape.
+      this.bumpNeighbours();
+    }
     return input;
   }
 
@@ -1451,25 +1377,28 @@ export class BlockSvg
    * Returns connections originating from this block.
    *
    * @param all If true, return all connections even hidden ones.
-   *     Otherwise, for a collapsed block don't return inputs connections.
+   *     Otherwise, for a non-rendered block return an empty list, and for a
+   *     collapsed block don't return inputs connections.
    * @returns Array of connections.
    * @internal
    */
   override getConnections_(all: boolean): RenderedConnection[] {
     const myConnections = [];
-    if (this.outputConnection) {
-      myConnections.push(this.outputConnection);
-    }
-    if (this.previousConnection) {
-      myConnections.push(this.previousConnection);
-    }
-    if (this.nextConnection) {
-      myConnections.push(this.nextConnection);
-    }
-    if (all || !this.collapsed_) {
-      for (let i = 0, input; (input = this.inputList[i]); i++) {
-        if (input.connection) {
-          myConnections.push(input.connection as RenderedConnection);
+    if (all || this.rendered) {
+      if (this.outputConnection) {
+        myConnections.push(this.outputConnection);
+      }
+      if (this.previousConnection) {
+        myConnections.push(this.previousConnection);
+      }
+      if (this.nextConnection) {
+        myConnections.push(this.nextConnection);
+      }
+      if (all || !this.collapsed_) {
+        for (let i = 0, input; (input = this.inputList[i]); i++) {
+          if (input.connection) {
+            myConnections.push(input.connection as RenderedConnection);
+          }
         }
       }
     }
@@ -1545,6 +1474,22 @@ export class BlockSvg
    * up on screen, because that creates confusion for end-users.
    */
   override bumpNeighbours() {
+    if (this.bumpNeighboursPid) return;
+    const group = eventUtils.getGroup();
+
+    this.bumpNeighboursPid = setTimeout(() => {
+      const oldGroup = eventUtils.getGroup();
+      eventUtils.setGroup(group);
+      this.getRootBlock().bumpNeighboursInternal();
+      eventUtils.setGroup(oldGroup);
+      this.bumpNeighboursPid = 0;
+    }, config.bumpDelay);
+  }
+
+  /**
+   * Bumps unconnected blocks out of alignment.
+   */
+  private bumpNeighboursInternal() {
     const root = this.getRootBlock();
     if (
       this.isDeadOrDying() ||
@@ -1561,28 +1506,41 @@ export class BlockSvg
     for (const conn of this.getConnections_(false)) {
       if (conn.isSuperior()) {
         // Recurse down the block stack.
-        conn.targetBlock()?.bumpNeighbours();
+        conn.targetBlock()?.bumpNeighboursInternal();
       }
 
       for (const neighbour of conn.neighbours(config.snapRadius)) {
+        // Don't bump away from things that are in our stack.
         if (neighbourIsInStack(neighbour)) continue;
+        // If both connections are connected, that's fine.
         if (conn.isConnected() && neighbour.isConnected()) continue;
 
+        // Always bump the inferior connection.
         if (conn.isSuperior()) {
-          neighbour.bumpAwayFrom(conn, /* initiatedByThis = */ false);
+          neighbour.bumpAwayFrom(conn);
         } else {
-          conn.bumpAwayFrom(neighbour, /* initiatedByThis = */ true);
+          conn.bumpAwayFrom(neighbour);
         }
       }
     }
   }
 
   /**
-   * Snap to grid, and then bump neighbouring blocks away at the end of the next
-   * render.
+   * Schedule snapping to grid and bumping neighbours to occur after a brief
+   * delay.
+   *
+   * @internal
    */
   scheduleSnapAndBump() {
-    this.snapToGrid();
+    // Ensure that any snap and bump are part of this move's event group.
+    const group = eventUtils.getGroup();
+
+    setTimeout(() => {
+      eventUtils.setGroup(group);
+      this.snapToGrid();
+      eventUtils.setGroup(false);
+    }, config.bumpDelay / 2);
+
     this.bumpNeighbours();
   }
 
@@ -1659,10 +1617,11 @@ export class BlockSvg
    * @internal
    */
   renderEfficiently() {
+    this.rendered = true;
     dom.startTextWidthCache();
 
     if (this.isCollapsed()) {
-      this.updateCollapsed();
+      this.updateCollapsed_();
     }
 
     if (!this.isEnabled()) {
@@ -1673,6 +1632,7 @@ export class BlockSvg
     this.tightenChildrenEfficiently();
 
     dom.stopTextWidthCache();
+    this.updateMarkers_();
   }
 
   /**
@@ -1690,6 +1650,44 @@ export class BlockSvg
       if (conn) conn.tightenEfficiently();
     }
     if (this.nextConnection) this.nextConnection.tightenEfficiently();
+  }
+
+  /** Redraw any attached marker or cursor svgs if needed. */
+  protected updateMarkers_() {
+    if (this.workspace.keyboardAccessibilityMode && this.pathObject.cursorSvg) {
+      this.workspace.getCursor()!.draw();
+    }
+    if (this.workspace.keyboardAccessibilityMode && this.pathObject.markerSvg) {
+      // TODO(#4592): Update all markers on the block.
+      this.workspace.getMarker(MarkerManager.LOCAL_MARKER)!.draw();
+    }
+    for (const input of this.inputList) {
+      for (const field of input.fieldRow) {
+        field.updateMarkers_();
+      }
+    }
+  }
+
+  /**
+   * Add the cursor SVG to this block's SVG group.
+   *
+   * @param cursorSvg The SVG root of the cursor to be added to the block SVG
+   *     group.
+   * @internal
+   */
+  setCursorSvg(cursorSvg: SVGElement) {
+    this.pathObject.setCursorSvg(cursorSvg);
+  }
+
+  /**
+   * Add the marker SVG to this block's SVG group.
+   *
+   * @param markerSvg The SVG root of the marker to be added to the block SVG
+   *     group.
+   * @internal
+   */
+  setMarkerSvg(markerSvg: SVGElement) {
+    this.pathObject.setMarkerSvg(markerSvg);
   }
 
   /**
@@ -1742,113 +1740,5 @@ export class BlockSvg
       conn,
       add,
     );
-  }
-
-  /**
-   * Returns the drag strategy currently in use by this block.
-   *
-   * @internal
-   * @returns This block's drag strategy.
-   */
-  getDragStrategy(): IDragStrategy {
-    return this.dragStrategy;
-  }
-
-  /** Sets the drag strategy for this block. */
-  setDragStrategy(dragStrategy: IDragStrategy) {
-    this.dragStrategy = dragStrategy;
-  }
-
-  /** Returns whether this block is copyable or not. */
-  isCopyable(): boolean {
-    return this.isOwnDeletable() && this.isOwnMovable();
-  }
-
-  /** Returns whether this block is movable or not. */
-  override isMovable(): boolean {
-    return this.dragStrategy.isMovable();
-  }
-
-  /** Starts a drag on the block. */
-  startDrag(e?: PointerEvent): void {
-    this.dragStrategy.startDrag(e);
-  }
-
-  /** Drags the block to the given location. */
-  drag(newLoc: Coordinate, e?: PointerEvent): void {
-    this.dragStrategy.drag(newLoc, e);
-  }
-
-  /** Ends the drag on the block. */
-  endDrag(e?: PointerEvent): void {
-    this.dragStrategy.endDrag(e);
-  }
-
-  /** Moves the block back to where it was at the start of a drag. */
-  revertDrag(): void {
-    this.dragStrategy.revertDrag();
-  }
-
-  /**
-   * Returns a representation of this block that can be displayed in a flyout.
-   */
-  toFlyoutInfo(): FlyoutItemInfo[] {
-    const json: FlyoutItemInfo = {
-      kind: 'BLOCK',
-      ...blocks.save(this),
-    };
-
-    const toRemove = new Set(['id', 'height', 'width', 'pinned', 'enabled']);
-
-    // Traverse the JSON recursively.
-    const traverseJson = function (json: {[key: string]: unknown}) {
-      for (const key in json) {
-        if (toRemove.has(key)) {
-          delete json[key];
-        } else if (typeof json[key] === 'object') {
-          traverseJson(json[key] as {[key: string]: unknown});
-        }
-      }
-    };
-
-    traverseJson(json as unknown as {[key: string]: unknown});
-    return [json];
-  }
-
-  override jsonInit(json: AnyDuringMigration): void {
-    super.jsonInit(json);
-
-    if (json['classes']) {
-      this.addClass(
-        Array.isArray(json['classes'])
-          ? json['classes'].join(' ')
-          : json['classes'],
-      );
-    }
-  }
-
-  /** See IFocusableNode.getFocusableElement. */
-  getFocusableElement(): HTMLElement | SVGElement {
-    return this.pathObject.svgPath;
-  }
-
-  /** See IFocusableNode.getFocusableTree. */
-  getFocusableTree(): IFocusableTree {
-    return this.workspace;
-  }
-
-  /** See IFocusableNode.onNodeFocus. */
-  onNodeFocus(): void {
-    this.select();
-  }
-
-  /** See IFocusableNode.onNodeBlur. */
-  onNodeBlur(): void {
-    this.unselect();
-  }
-
-  /** See IFocusableNode.canBeFocused. */
-  canBeFocused(): boolean {
-    return true;
   }
 }

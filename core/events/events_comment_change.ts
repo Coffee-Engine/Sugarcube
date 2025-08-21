@@ -11,17 +11,18 @@
  */
 // Former goog.module ID: Blockly.Events.CommentChange
 
-import type {WorkspaceComment} from '../comments/workspace_comment.js';
 import * as registry from '../registry.js';
-import type {Workspace} from '../workspace.js';
+import type {WorkspaceComment} from '../workspace_comment.js';
+
 import {CommentBase, CommentBaseJson} from './events_comment_base.js';
-import {EventType} from './type.js';
+import * as eventUtils from './utils.js';
+import type {Workspace} from '../workspace.js';
 
 /**
  * Notifies listeners that the contents of a workspace comment has changed.
  */
 export class CommentChange extends CommentBase {
-  override type = EventType.COMMENT_CHANGE;
+  override type = eventUtils.COMMENT_CHANGE;
 
   // TODO(#6774): We should remove underscores.
   /** The previous contents of the comment. */
@@ -123,16 +124,13 @@ export class CommentChange extends CommentBase {
           'the constructor, or call fromJson',
       );
     }
-    // TODO: Remove the cast when we fix the type of getCommentById.
-    const comment = workspace.getCommentById(
-      this.commentId,
-    ) as unknown as WorkspaceComment;
+    const comment = workspace.getCommentById(this.commentId);
     if (!comment) {
       console.warn("Can't change non-existent comment: " + this.commentId);
       return;
     }
     const contents = forward ? this.newContents_ : this.oldContents_;
-    if (contents === undefined) {
+    if (!contents) {
       if (forward) {
         throw new Error(
           'The new contents is undefined. Either pass a value to ' +
@@ -144,7 +142,7 @@ export class CommentChange extends CommentBase {
           'the constructor, or call fromJson',
       );
     }
-    comment.setText(contents);
+    comment.setContent(contents);
   }
 }
 
@@ -153,4 +151,8 @@ export interface CommentChangeJson extends CommentBaseJson {
   newContents: string;
 }
 
-registry.register(registry.Type.EVENT, EventType.COMMENT_CHANGE, CommentChange);
+registry.register(
+  registry.Type.EVENT,
+  eventUtils.COMMENT_CHANGE,
+  CommentChange,
+);

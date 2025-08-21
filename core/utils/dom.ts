@@ -6,6 +6,7 @@
 
 // Former goog.module ID: Blockly.utils.dom
 
+import * as deprecation from './deprecation.js';
 import type {Svg} from './svg.js';
 
 /**
@@ -154,6 +155,24 @@ export function insertAfter(newNode: Element, refNode: Element) {
 }
 
 /**
+ * Whether a node contains another node.
+ *
+ * @param parent The node that should contain the other node.
+ * @param descendant The node to test presence of.
+ * @returns Whether the parent node contains the descendant node.
+ * @deprecated Use native 'contains' DOM method.
+ */
+export function containsNode(parent: Node, descendant: Node): boolean {
+  deprecation.warn(
+    'Blockly.utils.dom.containsNode',
+    'version 10',
+    'version 11',
+    'Use native "contains" DOM method',
+  );
+  return parent.contains(descendant);
+}
+
+/**
  * Sets the CSS transform property on an element. This function sets the
  * non-vendor-prefixed and vendor-prefixed versions for backwards compatibility
  * with older browsers. See https://caniuse.com/#feat=transforms2d
@@ -208,14 +227,16 @@ export function getTextWidth(textElement: SVGTextElement): number {
     }
   }
 
-  // Compute the width of the SVG text element.
-  const style = window.getComputedStyle(textElement);
-  width = getFastTextWidthWithSizeString(
-    textElement,
-    style.fontSize,
-    style.fontWeight,
-    style.fontFamily,
-  );
+  // Attempt to compute fetch the width of the SVG text element.
+  try {
+    width = textElement.getComputedTextLength();
+  } catch (e) {
+    // In other cases where we fail to get the computed text. Instead, use an
+    // approximation and do not cache the result. At some later point in time
+    // when the block is inserted into the visible DOM, this method will be
+    // called again and, at that point in time, will not throw an exception.
+    return textElement.textContent!.length * 8;
+  }
 
   // Cache the computed width and return.
   if (cacheWidths) {
@@ -289,13 +310,13 @@ export function getFastTextWidthWithSizeString(
     // Initialize the HTML canvas context and set the font.
     // The context font must match blocklyText's fontsize and font-family
     // set in CSS.
-    canvasContext = computeCanvas.getContext('2d');
+    canvasContext = computeCanvas.getContext('2d') as CanvasRenderingContext2D;
   }
+  // Set the desired font size and family.
+  canvasContext.font = fontWeight + ' ' + fontSize + ' ' + fontFamily;
 
   // Measure the text width using the helper canvas context.
-  if (text && canvasContext) {
-    // Set the desired font size and family.
-    canvasContext.font = fontWeight + ' ' + fontSize + ' ' + fontFamily;
+  if (text) {
     width = canvasContext.measureText(text).width;
   } else {
     width = 0;

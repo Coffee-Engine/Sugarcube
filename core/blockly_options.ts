@@ -6,9 +6,9 @@
 
 // Former goog.module ID: Blockly.BlocklyOptions
 
-import type {ITheme, Theme} from './theme.js';
-import type {ToolboxDefinition} from './utils/toolbox.js';
+import type {Theme, ITheme} from './theme.js';
 import type {WorkspaceSvg} from './workspace_svg.js';
+import type {ToolboxDefinition} from './utils/toolbox.js';
 
 /**
  * Blockly options.

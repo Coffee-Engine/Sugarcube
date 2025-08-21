@@ -16,6 +16,7 @@ import type {IToolbox} from '../interfaces/i_toolbox.js';
 import * as registry from '../registry.js';
 import * as dom from '../utils/dom.js';
 import type * as toolbox from '../utils/toolbox.js';
+
 import {ToolboxItem} from './toolbox_item.js';
 
 /**
@@ -29,7 +30,7 @@ export class ToolboxSeparator extends ToolboxItem {
   /** All the CSS class names that are used to create a separator. */
   protected cssConfig_: CssConfig = {'container': 'blocklyTreeSeparator'};
 
-  private htmlDiv: HTMLDivElement | null = null;
+  private htmlDiv_: HTMLDivElement | null = null;
 
   /**
    * @param separatorDef The information needed to create a separator.
@@ -54,24 +55,20 @@ export class ToolboxSeparator extends ToolboxItem {
    */
   protected createDom_(): HTMLDivElement {
     const container = document.createElement('div');
-    // Ensure that the separator has a tab index to ensure it receives focus
-    // when clicked (since clicking isn't managed by the toolbox).
-    container.tabIndex = -1;
-    container.id = this.getId();
     const className = this.cssConfig_['container'];
     if (className) {
       dom.addClass(container, className);
     }
-    this.htmlDiv = container;
+    this.htmlDiv_ = container;
     return container;
   }
 
   override getDiv() {
-    return this.htmlDiv as HTMLDivElement;
+    return this.htmlDiv_ as HTMLDivElement;
   }
 
   override dispose() {
-    dom.removeNode(this.htmlDiv as HTMLDivElement);
+    dom.removeNode(this.htmlDiv_ as HTMLDivElement);
   }
 }
 
@@ -91,7 +88,7 @@ Css.register(`
   margin: 5px 0;
 }
 
-.blocklyToolbox[layout="h"] .blocklyTreeSeparator {
+.blocklyToolboxDiv[layout="h"] .blocklyTreeSeparator {
   border-right: solid #e5e5e5 1px;
   border-bottom: none;
   height: auto;

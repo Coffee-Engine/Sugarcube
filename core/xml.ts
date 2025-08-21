@@ -8,37 +8,33 @@
 
 import type {Block} from './block.js';
 import type {BlockSvg} from './block_svg.js';
-import {RenderedWorkspaceComment} from './comments/rendered_workspace_comment.js';
-import {WorkspaceComment} from './comments/workspace_comment.js';
 import type {Connection} from './connection.js';
-import {MANUALLY_DISABLED} from './constants.js';
-import {EventType} from './events/type.js';
 import * as eventUtils from './events/utils.js';
 import type {Field} from './field.js';
 import {IconType} from './icons/icon_types.js';
 import {inputTypes} from './inputs/input_types.js';
-import type {
-  IVariableModel,
-  IVariableState,
-} from './interfaces/i_variable_model.js';
-import * as renderManagement from './render_management.js';
-import {Coordinate} from './utils/coordinate.js';
 import * as dom from './utils/dom.js';
 import {Size} from './utils/size.js';
 import * as utilsXml from './utils/xml.js';
+import type {VariableModel} from './variable_model.js';
 import * as Variables from './variables.js';
 import type {Workspace} from './workspace.js';
-import {WorkspaceSvg} from './workspace_svg.js';
+import {WorkspaceComment} from './workspace_comment.js';
+import {WorkspaceCommentSvg} from './workspace_comment_svg.js';
+import type {WorkspaceSvg} from './workspace_svg.js';
+import * as renderManagement from './render_management.js';
 
 /**
  * Encode a block tree as XML.
  *
  * @param workspace The workspace containing blocks.
- * @param skipId True if the encoder should skip the block IDs. False by
- *     default.
+ * @param opt_noId True if the encoder should skip the block IDs.
  * @returns XML DOM element.
  */
-export function workspaceToDom(workspace: Workspace, skipId = false): Element {
+export function workspaceToDom(
+  workspace: Workspace,
+  opt_noId?: boolean,
+): Element {
   const treeXml = utilsXml.createElement('xml');
   const variablesElement = variablesToDom(
     Variables.allUsedVarModels(workspace),
@@ -46,42 +42,17 @@ export function workspaceToDom(workspace: Workspace, skipId = false): Element {
   if (variablesElement.hasChildNodes()) {
     treeXml.appendChild(variablesElement);
   }
-  for (const comment of workspace.getTopComments()) {
-    treeXml.appendChild(
-      saveWorkspaceComment(comment as AnyDuringMigration, skipId),
-    );
+  const comments = workspace.getTopComments(true);
+  for (let i = 0; i < comments.length; i++) {
+    const comment = comments[i];
+    treeXml.appendChild(comment.toXmlWithXY(opt_noId));
   }
   const blocks = workspace.getTopBlocks(true);
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
-    treeXml.appendChild(blockToDomWithXY(block, skipId));
+    treeXml.appendChild(blockToDomWithXY(block, opt_noId));
   }
   return treeXml;
-}
-
-/** Serializes the given workspace comment to XML. */
-export function saveWorkspaceComment(
-  comment: WorkspaceComment,
-  skipId = false,
-): Element {
-  const elem = utilsXml.createElement('comment');
-  if (!skipId) elem.setAttribute('id', comment.id);
-
-  const workspace = comment.workspace;
-  const loc = comment.getRelativeToSurfaceXY();
-  loc.x = workspace.RTL ? workspace.getWidth() - loc.x : loc.x;
-  elem.setAttribute('x', `${loc.x}`);
-  elem.setAttribute('y', `${loc.y}`);
-  elem.setAttribute('w', `${comment.getSize().width}`);
-  elem.setAttribute('h', `${comment.getSize().height}`);
-
-  if (comment.getText()) elem.textContent = comment.getText();
-  if (comment.isCollapsed()) elem.setAttribute('collapsed', 'true');
-  if (!comment.isOwnEditable()) elem.setAttribute('editable', 'false');
-  if (!comment.isOwnMovable()) elem.setAttribute('movable', 'false');
-  if (!comment.isOwnDeletable()) elem.setAttribute('deletable', 'false');
-
-  return elem;
 }
 
 /**
@@ -90,16 +61,14 @@ export function saveWorkspaceComment(
  * @param variableList List of all variable models.
  * @returns Tree of XML elements.
  */
-export function variablesToDom(
-  variableList: IVariableModel<IVariableState>[],
-): Element {
+export function variablesToDom(variableList: VariableModel[]): Element {
   const variables = utilsXml.createElement('variables');
   for (let i = 0; i < variableList.length; i++) {
     const variable = variableList[i];
     const element = utilsXml.createElement('variable');
-    element.appendChild(utilsXml.createTextNode(variable.getName()));
-    if (variable.getType()) {
-      element.setAttribute('type', variable.getType());
+    element.appendChild(utilsXml.createTextNode(variable.name));
+    if (variable.type) {
+      element.setAttribute('type', variable.type);
     }
     element.id = variable.getId();
     variables.appendChild(element);
@@ -168,10 +137,14 @@ function fieldToDom(field: Field): Element | null {
  * @param element The XML element to which the field DOM should be attached.
  */
 function allFieldsToDom(block: Block, element: Element) {
-  for (const field of block.getFields()) {
-    const fieldDom = fieldToDom(field);
-    if (fieldDom) {
-      element.appendChild(fieldDom);
+  for (let i = 0; i < block.inputList.length; i++) {
+    const input = block.inputList[i];
+    for (let j = 0; j < input.fieldRow.length; j++) {
+      const field = input.fieldRow[j];
+      const fieldDom = fieldToDom(field);
+      if (fieldDom) {
+        element.appendChild(fieldDom);
+      }
     }
   }
 }
@@ -219,24 +192,12 @@ export function blockToDom(
     const comment = block.getIcon(IconType.COMMENT)!;
     const size = comment.getBubbleSize();
     const pinned = comment.bubbleIsVisible();
-    const location = comment.getBubbleLocation();
 
     const commentElement = utilsXml.createElement('comment');
     commentElement.appendChild(utilsXml.createTextNode(commentText));
     commentElement.setAttribute('pinned', `${pinned}`);
-    commentElement.setAttribute('h', `${size.height}`);
-    commentElement.setAttribute('w', `${size.width}`);
-    if (location) {
-      commentElement.setAttribute(
-        'x',
-        `${
-          block.workspace.RTL
-            ? block.workspace.getWidth() - (location.x + size.width)
-            : location.x
-        }`,
-      );
-      commentElement.setAttribute('y', `${location.y}`);
-    }
+    commentElement.setAttribute('h', String(size.height));
+    commentElement.setAttribute('w', String(size.width));
 
     element.appendChild(commentElement);
   }
@@ -287,21 +248,15 @@ export function blockToDom(
     element.setAttribute('collapsed', 'true');
   }
   if (!block.isEnabled()) {
-    // Set the value of the attribute to a comma-separated list of reasons.
-    // Use encodeURIComponent to escape commas in the reasons so that they
-    // won't be confused with separator commas.
-    element.setAttribute(
-      'disabled-reasons',
-      Array.from(block.getDisabledReasons()).map(encodeURIComponent).join(','),
-    );
+    element.setAttribute('disabled', 'true');
   }
-  if (!block.isOwnDeletable()) {
+  if (!block.isDeletable() && !block.isShadow()) {
     element.setAttribute('deletable', 'false');
   }
-  if (!block.isOwnMovable()) {
+  if (!block.isMovable() && !block.isShadow()) {
     element.setAttribute('movable', 'false');
   }
-  if (!block.isOwnEditable()) {
+  if (!block.isEditable()) {
     element.setAttribute('editable', 'false');
   }
 
@@ -488,7 +443,15 @@ export function domToWorkspace(xml: Element, workspace: Workspace): string[] {
       } else if (name === 'shadow') {
         throw TypeError('Shadow block cannot be a top-level block.');
       } else if (name === 'comment') {
-        loadWorkspaceComment(xmlChildElement, workspace);
+        if (workspace.rendered) {
+          WorkspaceCommentSvg.fromXmlRendered(
+            xmlChildElement,
+            workspace as WorkspaceSvg,
+            width,
+          );
+        } else {
+          WorkspaceComment.fromXml(xmlChildElement, workspace);
+        }
       } else if (name === 'variables') {
         if (variablesFirst) {
           domToVariables(xmlChildElement, workspace);
@@ -511,39 +474,8 @@ export function domToWorkspace(xml: Element, workspace: Workspace): string[] {
     dom.stopTextWidthCache();
   }
   // Re-enable workspace resizing.
-  eventUtils.fire(new (eventUtils.get(EventType.FINISHED_LOADING))(workspace));
+  eventUtils.fire(new (eventUtils.get(eventUtils.FINISHED_LOADING))(workspace));
   return newBlockIds;
-}
-
-/** Deserializes the given comment state into the given workspace. */
-export function loadWorkspaceComment(
-  elem: Element,
-  workspace: Workspace,
-): WorkspaceComment {
-  const id = elem.getAttribute('id') ?? undefined;
-  const comment = workspace.rendered
-    ? new RenderedWorkspaceComment(workspace as WorkspaceSvg, id)
-    : new WorkspaceComment(workspace, id);
-
-  comment.setText(elem.textContent ?? '');
-
-  let x = parseInt(elem.getAttribute('x') ?? '', 10);
-  const y = parseInt(elem.getAttribute('y') ?? '', 10);
-  if (!isNaN(x) && !isNaN(y)) {
-    x = workspace.RTL ? workspace.getWidth() - x : x;
-    comment.moveTo(new Coordinate(x, y));
-  }
-
-  const w = parseInt(elem.getAttribute('w') ?? '', 10);
-  const h = parseInt(elem.getAttribute('h') ?? '', 10);
-  if (!isNaN(w) && !isNaN(h)) comment.setSize(new Size(w, h));
-
-  if (elem.getAttribute('collapsed') === 'true') comment.setCollapsed(true);
-  if (elem.getAttribute('editable') === 'false') comment.setEditable(false);
-  if (elem.getAttribute('movable') === 'false') comment.setMovable(false);
-  if (elem.getAttribute('deletable') === 'false') comment.setDeletable(false);
-
-  return comment;
 }
 
 /**
@@ -680,11 +612,13 @@ export function domToBlockInternal(
     // Fire a VarCreate event for each (if any) new variable created.
     for (let i = 0; i < newVariables.length; i++) {
       const thisVariable = newVariables[i];
-      eventUtils.fire(new (eventUtils.get(EventType.VAR_CREATE))(thisVariable));
+      eventUtils.fire(
+        new (eventUtils.get(eventUtils.VAR_CREATE))(thisVariable),
+      );
     }
     // Block events come after var events, in case they refer to newly created
     // variables.
-    eventUtils.fire(new (eventUtils.get(EventType.BLOCK_CREATE))(topBlock));
+    eventUtils.fire(new (eventUtils.get(eventUtils.CREATE))(topBlock));
   }
   return topBlock;
 }
@@ -703,7 +637,7 @@ export function domToVariables(xmlVariables: Element, workspace: Workspace) {
     const name = xmlChild.textContent;
 
     if (!name) return;
-    workspace.getVariableMap().createVariable(name, type ?? undefined, id);
+    workspace.createVariable(name, type, id);
   }
 }
 
@@ -807,8 +741,6 @@ function applyCommentTagNodes(xmlChildren: Element[], block: Block) {
     const pinned = xmlChild.getAttribute('pinned') === 'true';
     const width = parseInt(xmlChild.getAttribute('w') ?? '50', 10);
     const height = parseInt(xmlChild.getAttribute('h') ?? '50', 10);
-    let x = parseInt(xmlChild.getAttribute('x') ?? '', 10);
-    const y = parseInt(xmlChild.getAttribute('y') ?? '', 10);
 
     block.setCommentText(text);
     const comment = block.getIcon(IconType.COMMENT)!;
@@ -817,15 +749,8 @@ function applyCommentTagNodes(xmlChildren: Element[], block: Block) {
     }
     // Set the pinned state of the bubble.
     comment.setBubbleVisible(pinned);
-
     // Actually show the bubble after the block has been rendered.
-    setTimeout(() => {
-      if (!isNaN(x) && !isNaN(y)) {
-        x = block.workspace.RTL ? block.workspace.getWidth() - (x + width) : x;
-        comment.setBubbleLocation(new Coordinate(x, y));
-      }
-      comment.setBubbleVisible(pinned);
-    }, 1);
+    setTimeout(() => comment.setBubbleVisible(pinned), 1);
   }
 }
 
@@ -974,7 +899,7 @@ function applyNextTagNodes(
  *
  * @param xmlBlock XML block element.
  * @param workspace The workspace.
- * @param parentConnection The parent connection to connect this block to
+ * @param parentConnection The parent connection to to connect this block to
  *     after instantiating.
  * @param connectedToParentNext Whether the provided parent connection is a next
  *     connection, rather than output or statement.
@@ -1043,20 +968,7 @@ function domToBlockHeadless(
   }
   const disabled = xmlBlock.getAttribute('disabled');
   if (disabled) {
-    // Before May 2024 we just used 'disabled', with no reasons.
-    // Contiune to support this syntax.
-    block.setDisabledReason(
-      disabled === 'true' || disabled === 'disabled',
-      MANUALLY_DISABLED,
-    );
-  }
-  const disabledReasons = xmlBlock.getAttribute('disabled-reasons');
-  if (disabledReasons !== null) {
-    for (const reason of disabledReasons.split(',')) {
-      // Use decodeURIComponent to restore characters that were encoded in the
-      // value, such as commas.
-      block.setDisabledReason(true, decodeURIComponent(reason));
-    }
+    block.setEnabled(disabled !== 'true' && disabled !== 'disabled');
   }
   const deletable = xmlBlock.getAttribute('deletable');
   if (deletable) {

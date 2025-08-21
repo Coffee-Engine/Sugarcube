@@ -8,6 +8,8 @@
 
 import type {BlockSvg} from '../../block_svg.js';
 import type {ConstantProvider} from '../common/constants.js';
+
+import {Hat} from './hat.js';
 import type {PreviousConnection} from './previous_connection.js';
 import {Row} from './row.js';
 import {Types} from './types.js';
@@ -84,7 +86,7 @@ export class TopRow extends Row {
       const elem = this.elements[i];
       width += elem.width;
       if (!Types.isSpacer(elem)) {
-        if (Types.isHat(elem)) {
+        if (Types.isHat(elem) && elem instanceof Hat) {
           ascenderHeight = Math.max(ascenderHeight, elem.ascenderHeight);
         } else {
           height = Math.max(height, elem.height);

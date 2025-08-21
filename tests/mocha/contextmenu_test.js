@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {callbackFactory} from '../../build/src/core/contextmenu.js';
-import * as xmlUtils from '../../build/src/core/utils/xml.js';
-import {assert} from '../../node_modules/chai/chai.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
 } from './test_helpers/setup_teardown.js';
+
+import {callbackFactory} from '../../build/src/core/contextmenu.js';
+import * as xmlUtils from '../../build/src/core/utils/xml.js';
+import * as Variables from '../../build/src/core/variables.js';
 
 suite('Context Menu', function () {
   setup(function () {
@@ -31,13 +32,9 @@ suite('Context Menu', function () {
     });
 
     test('callback with xml state creates block', function () {
-      const variable = this.forLoopBlock.getField('VAR').getVariable();
-      const xmlField = document.createElement('field');
-      xmlField.setAttribute('name', 'VAR');
-      xmlField.setAttribute('id', variable.getId());
-      xmlField.setAttribute('variabletype', variable.getType());
-      xmlField.textContent = variable.getName();
-
+      const xmlField = Variables.generateVariableFieldDom(
+        this.forLoopBlock.getField('VAR').getVariable(),
+      );
       const xmlBlock = xmlUtils.createElement('block');
       xmlBlock.setAttribute('type', 'variables_get');
       xmlBlock.appendChild(xmlField);
@@ -45,9 +42,9 @@ suite('Context Menu', function () {
       const callback = callbackFactory(this.forLoopBlock, xmlBlock);
       const getVarBlock = callback();
 
-      assert.equal(getVarBlock.type, 'variables_get');
-      assert.equal(getVarBlock.workspace, this.forLoopBlock.workspace);
-      assert.equal(
+      chai.assert.equal(getVarBlock.type, 'variables_get');
+      chai.assert.equal(getVarBlock.workspace, this.forLoopBlock.workspace);
+      chai.assert.equal(
         getVarBlock.getField('VAR').getVariable().getId(),
         this.forLoopBlock.getField('VAR').getVariable().getId(),
       );
@@ -62,9 +59,9 @@ suite('Context Menu', function () {
       const callback = callbackFactory(this.forLoopBlock, jsonState);
       const getVarBlock = callback();
 
-      assert.equal(getVarBlock.type, 'variables_get');
-      assert.equal(getVarBlock.workspace, this.forLoopBlock.workspace);
-      assert.equal(
+      chai.assert.equal(getVarBlock.type, 'variables_get');
+      chai.assert.equal(getVarBlock.workspace, this.forLoopBlock.workspace);
+      chai.assert.equal(
         getVarBlock.getField('VAR').getVariable().getId(),
         this.forLoopBlock.getField('VAR').getVariable().getId(),
       );

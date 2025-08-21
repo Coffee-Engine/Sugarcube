@@ -238,13 +238,14 @@ export function getBasicToolbox() {
   const workspace = new Blockly.WorkspaceSvg(new Blockly.Options({}));
   const toolbox = new Blockly.Toolbox(workspace);
   toolbox.HtmlDiv = document.createElement('div');
-  toolbox.flyout = sinon.createStubInstance(Blockly.VerticalFlyout);
+  toolbox.flyout_ = sinon.createStubInstance(Blockly.VerticalFlyout);
   return toolbox;
 }
 
 export function getCollapsibleItem(toolbox) {
-  const contents = toolbox.contents.values();
-  for (const item of contents) {
+  const contents = toolbox.contents_;
+  for (let i = 0; i < contents.length; i++) {
+    const item = contents[i];
     if (item.isCollapsible()) {
       return item;
     }
@@ -252,8 +253,9 @@ export function getCollapsibleItem(toolbox) {
 }
 
 export function getNonCollapsibleItem(toolbox) {
-  const contents = toolbox.contents.values();
-  for (const item of contents) {
+  const contents = toolbox.contents_;
+  for (let i = 0; i < contents.length; i++) {
+    const item = contents[i];
     if (!item.isCollapsible()) {
       return item;
     }

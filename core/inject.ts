@@ -13,12 +13,16 @@ import * as common from './common.js';
 import * as Css from './css.js';
 import * as dropDownDiv from './dropdowndiv.js';
 import {Grid} from './grid.js';
+import {Msg} from './msg.js';
 import {Options} from './options.js';
 import {ScrollbarPair} from './scrollbar_pair.js';
+import {ShortcutRegistry} from './shortcut_registry.js';
 import * as Tooltip from './tooltip.js';
 import * as Touch from './touch.js';
+import * as aria from './utils/aria.js';
 import * as dom from './utils/dom.js';
 import {Svg} from './utils/svg.js';
+import * as userAgent from './utils/useragent.js';
 import * as WidgetDiv from './widgetdiv.js';
 import {WorkspaceSvg} from './workspace_svg.js';
 
@@ -49,10 +53,9 @@ export function inject(
   }
   const options = new Options(opt_options || ({} as BlocklyOptions));
   const subContainer = document.createElement('div');
-  dom.addClass(subContainer, 'injectionDiv');
-  if (opt_options?.rtl) {
-    dom.addClass(subContainer, 'blocklyRTL');
-  }
+  subContainer.className = 'injectionDiv';
+  subContainer.tabIndex = 0;
+  aria.setState(subContainer, aria.State.LABEL, Msg['WORKSPACE_ARIA_LABEL']);
 
   containerElement!.appendChild(subContainer);
   const svg = createDom(subContainer, options);
@@ -71,13 +74,6 @@ export function inject(
     common.setMainWorkspace(workspace);
   });
 
-  browserEvents.conditionalBind(
-    subContainer,
-    'keydown',
-    null,
-    common.globalShortcutHandler,
-  );
-
   return workspace;
 }
 
@@ -88,7 +84,7 @@ export function inject(
  * @param options Dictionary of options.
  * @returns Newly created SVG image.
  */
-function createDom(container: HTMLElement, options: Options): SVGElement {
+function createDom(container: Element, options: Options): SVGElement {
   // Sadly browsers (Chrome vs Firefox) are currently inconsistent in laying
   // out content in RTL mode.  Therefore Blockly forces the use of LTR,
   // then manually positions content in RTL as needed.
@@ -116,6 +112,7 @@ function createDom(container: HTMLElement, options: Options): SVGElement {
       'xmlns:xlink': dom.XLINK_NS,
       'version': '1.1',
       'class': 'blocklySvg',
+      'tabindex': '0',
     },
     container,
   );
@@ -130,12 +127,7 @@ function createDom(container: HTMLElement, options: Options): SVGElement {
   // https://neil.fraser.name/news/2015/11/01/
   const rnd = String(Math.random()).substring(2);
 
-  options.gridPattern = Grid.createDom(
-    rnd,
-    options.gridOptions,
-    defs,
-    container,
-  );
+  options.gridPattern = Grid.createDom(rnd, options.gridOptions, defs);
   return svg;
 }
 
@@ -147,7 +139,7 @@ function createDom(container: HTMLElement, options: Options): SVGElement {
  * @returns Newly created main workspace.
  */
 function createMainWorkspace(
-  injectionDiv: HTMLElement,
+  injectionDiv: Element,
   svg: SVGElement,
   options: Options,
 ): WorkspaceSvg {
@@ -287,6 +279,32 @@ function init(mainWorkspace: WorkspaceSvg) {
 }
 
 /**
+ * Handle a key-down on SVG drawing surface. Does nothing if the main workspace
+ * is not visible.
+ *
+ * @param e Key down event.
+ */
+// TODO (https://github.com/google/blockly/issues/1998) handle cases where there
+// are multiple workspaces and non-main workspaces are able to accept input.
+function onKeyDown(e: KeyboardEvent) {
+  const mainWorkspace = common.getMainWorkspace() as WorkspaceSvg;
+  if (!mainWorkspace) {
+    return;
+  }
+
+  if (
+    browserEvents.isTargetInput(e) ||
+    (mainWorkspace.rendered && !mainWorkspace.isVisible())
+  ) {
+    // When focused on an HTML text input widget, don't trap any keys.
+    // Ignore keypresses on rendered workspaces that have been explicitly
+    // hidden.
+    return;
+  }
+  ShortcutRegistry.registry.onKeyDown(mainWorkspace, e);
+}
+
+/**
  * Whether event handlers have been bound. Document event handlers will only
  * be bound once, even if Blockly is destroyed and reinjected.
  */
@@ -299,6 +317,8 @@ let documentEventsBound = false;
  * Most of these events should be bound to the SVG's surface.
  * However, 'mouseup' has to be on the whole document so that a block dragged
  * out of bounds and released will know that it has been released.
+ * Also, 'keydown' has to be on the whole document since the browser doesn't
+ * understand a concept of focus on the SVG image.
  */
 function bindDocumentEvents() {
   if (!documentEventsBound) {
@@ -310,10 +330,23 @@ function bindDocumentEvents() {
         }
       }
     });
+    browserEvents.conditionalBind(document, 'keydown', null, onKeyDown);
     // longStop needs to run to stop the context menu from showing up.  It
     // should run regardless of what other touch event handlers have run.
     browserEvents.bind(document, 'touchend', null, Touch.longStop);
     browserEvents.bind(document, 'touchcancel', null, Touch.longStop);
+    // Some iPad versions don't fire resize after portrait to landscape change.
+    if (userAgent.IPAD) {
+      browserEvents.conditionalBind(
+        window,
+        'orientationchange',
+        document,
+        function () {
+          // TODO (#397): Fix for multiple Blockly workspaces.
+          common.svgResize(common.getMainWorkspace() as WorkspaceSvg);
+        },
+      );
+    }
   }
   documentEventsBound = true;
 }

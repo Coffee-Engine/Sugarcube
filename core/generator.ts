@@ -16,6 +16,7 @@ import type {Block} from './block.js';
 import * as common from './common.js';
 import {Names, NameType} from './names.js';
 import type {Workspace} from './workspace.js';
+import {warn} from './utils/deprecation.js';
 
 /**
  * Deprecated, no-longer used type declaration for per-block-type generator
@@ -24,7 +25,7 @@ import type {Workspace} from './workspace.js';
  * @deprecated
  * @see {@link https://developers.google.com/blockly/guides/create-custom-blocks/generating-code}
  * @param block The Block instance to generate code for.
- * @param generator The CodeGenerator calling the function.
+ * @param genearator The CodeGenerator calling the function.
  * @returns A string containing the generated code (for statement blocks),
  *     or a [code, precedence] tuple (for value/expression blocks), or
  *     null if no code should be emitted for block.
@@ -252,8 +253,18 @@ export class CodeGenerator {
       return opt_thisOnly ? '' : this.blockToCode(block.getChildren(false)[0]);
     }
 
-    // Look up block generator function in dictionary.
-    const func = this.forBlock[block.type];
+    // Look up block generator function in dictionary - but fall back
+    // to looking up on this if not found, for backwards compatibility.
+    let func = this.forBlock[block.type];
+    if (!func && (this as any)[block.type]) {
+      warn(
+        'block generator functions on CodeGenerator objects',
+        '10.0',
+        '11.0',
+        'the .forBlock[blockType] dictionary',
+      );
+      func = (this as any)[block.type];
+    }
     if (typeof func !== 'function') {
       throw Error(
         `${this.name_} generator does not know how to generate code ` +
@@ -294,17 +305,14 @@ export class CodeGenerator {
    * @param name The name of the input.
    * @param outerOrder The maximum binding strength (minimum order value) of any
    *     operators adjacent to "block".
-   * @returns Generated code or '' if no blocks are connected.
-   * @throws ReferenceError if the specified input does not exist.
+   * @returns Generated code or '' if no blocks are connected or the specified
+   *     input does not exist.
    */
   valueToCode(block: Block, name: string, outerOrder: number): string {
     if (isNaN(outerOrder)) {
       throw TypeError('Expecting valid order from block: ' + block.type);
     }
     const targetBlock = block.getInputTargetBlock(name);
-    if (!targetBlock && !block.getInput(name)) {
-      throw ReferenceError(`Input "${name}" doesn't exist on "${block.type}"`);
-    }
     if (!targetBlock) {
       return '';
     }
@@ -380,13 +388,9 @@ export class CodeGenerator {
    * @param block The block containing the input.
    * @param name The name of the input.
    * @returns Generated code or '' if no blocks are connected.
-   * @throws ReferenceError if the specified input does not exist.
    */
   statementToCode(block: Block, name: string): string {
     const targetBlock = block.getInputTargetBlock(name);
-    if (!targetBlock && !block.getInput(name)) {
-      throw ReferenceError(`Input "${name}" doesn't exist on "${block.type}"`);
-    }
     let code = this.blockToCode(targetBlock);
     // Value blocks must return code and order of operations info.
     // Statement blocks must only return code.
@@ -574,7 +578,11 @@ export class CodeGenerator {
    * @param _opt_thisOnly True to generate code for only this statement.
    * @returns Code with comments and subsequent blocks added.
    */
-  scrub_(_block: Block, code: string, _opt_thisOnly?: boolean): string {
+  protected scrub_(
+    _block: Block,
+    code: string,
+    _opt_thisOnly?: boolean,
+  ): string {
     // Optionally override
     return code;
   }

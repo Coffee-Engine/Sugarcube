@@ -6,43 +6,38 @@
 
 // Former goog.module ID: Blockly.libraryBlocks.procedures
 
+import * as ContextMenu from '../core/contextmenu.js';
+import * as Events from '../core/events/events.js';
+import * as Procedures from '../core/procedures.js';
+import * as Variables from '../core/variables.js';
+import * as Xml from '../core/xml.js';
+import * as fieldRegistry from '../core/field_registry.js';
+import * as xmlUtils from '../core/utils/xml.js';
+import type {Abstract as AbstractEvent} from '../core/events/events_abstract.js';
+import {Align} from '../core/inputs/input.js';
 import type {Block} from '../core/block.js';
 import type {BlockSvg} from '../core/block_svg.js';
+import type {BlockCreate} from '../core/events/events_block_create.js';
+import type {BlockChange} from '../core/events/events_block_change.js';
 import type {BlockDefinition} from '../core/blocks.js';
-import {defineBlocks} from '../core/common.js';
-import {config} from '../core/config.js';
 import type {Connection} from '../core/connection.js';
-import * as ContextMenu from '../core/contextmenu.js';
 import type {
   ContextMenuOption,
   LegacyContextMenuOption,
 } from '../core/contextmenu_registry.js';
-import * as Events from '../core/events/events.js';
-import type {Abstract as AbstractEvent} from '../core/events/events_abstract.js';
-import type {BlockChange} from '../core/events/events_block_change.js';
-import type {BlockCreate} from '../core/events/events_block_create.js';
-import * as eventUtils from '../core/events/utils.js';
 import {FieldCheckbox} from '../core/field_checkbox.js';
 import {FieldLabel} from '../core/field_label.js';
-import * as fieldRegistry from '../core/field_registry.js';
 import {FieldTextInput} from '../core/field_textinput.js';
-import {getFocusManager} from '../core/focus_manager.js';
-import '../core/icons/comment_icon.js';
-import {MutatorIcon as Mutator} from '../core/icons/mutator_icon.js';
-import '../core/icons/warning_icon.js';
-import {Align} from '../core/inputs/align.js';
-import type {
-  IVariableModel,
-  IVariableState,
-} from '../core/interfaces/i_variable_model.js';
 import {Msg} from '../core/msg.js';
+import {MutatorIcon as Mutator} from '../core/icons/mutator_icon.js';
 import {Names} from '../core/names.js';
-import * as Procedures from '../core/procedures.js';
-import * as xmlUtils from '../core/utils/xml.js';
-import * as Variables from '../core/variables.js';
+import type {VariableModel} from '../core/variable_model.js';
 import type {Workspace} from '../core/workspace.js';
 import type {WorkspaceSvg} from '../core/workspace_svg.js';
-import * as Xml from '../core/xml.js';
+import {config} from '../core/config.js';
+import {defineBlocks} from '../core/common.js';
+import '../core/icons/comment_icon.js';
+import '../core/icons/warning_icon.js';
 
 /** A dictionary of the block definitions provided by this module. */
 export const blocks: {[key: string]: BlockDefinition} = {};
@@ -51,7 +46,7 @@ export const blocks: {[key: string]: BlockDefinition} = {};
 type ProcedureBlock = Block & ProcedureMixin;
 interface ProcedureMixin extends ProcedureMixinType {
   arguments_: string[];
-  argumentVarModels_: IVariableModel<IVariableState>[];
+  argumentVarModels_: VariableModel[];
   callType_: string;
   paramIds_: string[];
   hasStatements_: boolean;
@@ -131,7 +126,7 @@ const PROCEDURE_DEF_COMMON = {
     for (let i = 0; i < this.argumentVarModels_.length; i++) {
       const parameter = xmlUtils.createElement('arg');
       const argModel = this.argumentVarModels_[i];
-      parameter.setAttribute('name', argModel.getName());
+      parameter.setAttribute('name', argModel.name);
       parameter.setAttribute('varid', argModel.getId());
       if (opt_paramIds && this.paramIds_) {
         parameter.setAttribute('paramId', this.paramIds_[i]);
@@ -199,7 +194,7 @@ const PROCEDURE_DEF_COMMON = {
         state['params'].push({
           // We don't need to serialize the name, but just in case we decide
           // to separate params from variables.
-          'name': this.argumentVarModels_[i].getName(),
+          'name': this.argumentVarModels_[i].name,
           'id': this.argumentVarModels_[i].getId(),
         });
       }
@@ -227,7 +222,7 @@ const PROCEDURE_DEF_COMMON = {
           param['name'],
           '',
         );
-        this.arguments_.push(variable.getName());
+        this.arguments_.push(variable.name);
         this.argumentVarModels_.push(variable);
       }
     }
@@ -355,9 +350,7 @@ const PROCEDURE_DEF_COMMON = {
    *
    * @returns List of variable models.
    */
-  getVarModels: function (
-    this: ProcedureBlock,
-  ): IVariableModel<IVariableState>[] {
+  getVarModels: function (this: ProcedureBlock): VariableModel[] {
     return this.argumentVarModels_;
   },
   /**
@@ -375,23 +368,23 @@ const PROCEDURE_DEF_COMMON = {
     newId: string,
   ) {
     const oldVariable = this.workspace.getVariableById(oldId)!;
-    if (oldVariable.getType() !== '') {
+    if (oldVariable.type !== '') {
       // Procedure arguments always have the empty type.
       return;
     }
-    const oldName = oldVariable.getName();
+    const oldName = oldVariable.name;
     const newVar = this.workspace.getVariableById(newId)!;
 
     let change = false;
     for (let i = 0; i < this.argumentVarModels_.length; i++) {
       if (this.argumentVarModels_[i].getId() === oldId) {
-        this.arguments_[i] = newVar.getName();
+        this.arguments_[i] = newVar.name;
         this.argumentVarModels_[i] = newVar;
         change = true;
       }
     }
     if (change) {
-      this.displayRenamedVar_(oldName, newVar.getName());
+      this.displayRenamedVar_(oldName, newVar.name);
       Procedures.mutateCallers(this);
     }
   },
@@ -403,9 +396,9 @@ const PROCEDURE_DEF_COMMON = {
    */
   updateVarName: function (
     this: ProcedureBlock & BlockSvg,
-    variable: IVariableModel<IVariableState>,
+    variable: VariableModel,
   ) {
-    const newName = variable.getName();
+    const newName = variable.name;
     let change = false;
     let oldName;
     for (let i = 0; i < this.argumentVarModels_.length; i++) {
@@ -478,16 +471,12 @@ const PROCEDURE_DEF_COMMON = {
         const getVarBlockState = {
           type: 'variables_get',
           fields: {
-            VAR: {
-              name: argVar.getName(),
-              id: argVar.getId(),
-              type: argVar.getType(),
-            },
+            VAR: {name: argVar.name, id: argVar.getId(), type: argVar.type},
           },
         };
         options.push({
           enabled: true,
-          text: Msg['VARIABLES_SET_CREATE_GET'].replace('%1', argVar.getName()),
+          text: Msg['VARIABLES_SET_CREATE_GET'].replace('%1', argVar.name),
           callback: ContextMenu.callbackFactory(this, getVarBlockState),
         });
       }
@@ -629,49 +618,30 @@ type ArgumentBlock = Block & ArgumentMixin;
 interface ArgumentMixin extends ArgumentMixinType {}
 type ArgumentMixinType = typeof PROCEDURES_MUTATORARGUMENT;
 
-/**
- * Field responsible for editing procedure argument names.
- */
-class ProcedureArgumentField extends FieldTextInput {
-  /**
-   * Whether or not this field is currently being edited interactively.
-   */
-  editingInteractively = false;
-
-  /**
-   * The procedure argument variable whose name is being interactively edited.
-   */
-  editingVariable?: IVariableModel<IVariableState>;
-
-  /**
-   * Displays the field editor.
-   *
-   * @param e The event that triggered display of the field editor.
-   */
-  protected override showEditor_(e?: Event) {
-    super.showEditor_(e);
-    this.editingInteractively = true;
-    this.editingVariable = undefined;
-  }
-
-  /**
-   * Handles cleanup when the field editor is dismissed.
-   */
-  override onFinishEditing_(value: string) {
-    super.onFinishEditing_(value);
-    this.editingInteractively = false;
-  }
-}
+// TODO(#6920): This is kludgy.
+type FieldTextInputForArgument = FieldTextInput & {
+  oldShowEditorFn_(_e?: Event, quietInput?: boolean): void;
+  createdVariables_: VariableModel[];
+};
 
 const PROCEDURES_MUTATORARGUMENT = {
   /**
    * Mutator block for procedure argument.
    */
   init: function (this: ArgumentBlock) {
-    const field = new ProcedureArgumentField(
-      Procedures.DEFAULT_ARG,
-      this.validator_,
-    );
+    const field = fieldRegistry.fromJson({
+      type: 'field_input',
+      text: Procedures.DEFAULT_ARG,
+    }) as FieldTextInputForArgument;
+    field.setValidator(this.validator_);
+    // Hack: override showEditor to do just a little bit more work.
+    // We don't have a good place to hook into the start of a text edit.
+    field.oldShowEditorFn_ = (field as AnyDuringMigration).showEditor_;
+    const newShowEditorFn = function (this: typeof field) {
+      this.createdVariables_ = [];
+      this.oldShowEditorFn_();
+    };
+    (field as AnyDuringMigration).showEditor_ = newShowEditorFn;
 
     this.appendDummyInput()
       .appendField(Msg['PROCEDURES_MUTATORARG_TITLE'])
@@ -681,6 +651,14 @@ const PROCEDURES_MUTATORARGUMENT = {
     this.setStyle('procedure_blocks');
     this.setTooltip(Msg['PROCEDURES_MUTATORARG_TOOLTIP']);
     this.contextMenu = false;
+
+    // Create the default variable when we drag the block in from the flyout.
+    // Have to do this after installing the field on the block.
+    field.onFinishEditing_ = this.deleteIntermediateVars_;
+    // Create an empty list so onFinishEditing_ has something to look at, even
+    // though the editor was never opened.
+    field.createdVariables_ = [];
+    field.onFinishEditing_('x');
   },
 
   /**
@@ -694,11 +672,11 @@ const PROCEDURES_MUTATORARGUMENT = {
    * @returns Valid name, or null if a name was not specified.
    */
   validator_: function (
-    this: ProcedureArgumentField,
+    this: FieldTextInputForArgument,
     varName: string,
   ): string | null {
     const sourceBlock = this.getSourceBlock()!;
-    const outerWs = sourceBlock.workspace.getRootWorkspace()!;
+    const outerWs = sourceBlock!.workspace.getRootWorkspace()!;
     varName = varName.replace(/[\s\xa0]+/g, ' ').replace(/^ | $/g, '');
     if (!varName) {
       return null;
@@ -727,23 +705,42 @@ const PROCEDURES_MUTATORARGUMENT = {
       return varName;
     }
 
-    const model = outerWs.getVariable(varName, '');
-    if (model && model.getName() !== varName) {
+    let model = outerWs.getVariable(varName, '');
+    if (model && model.name !== varName) {
       // Rename the variable (case change)
       outerWs.renameVariableById(model.getId(), varName);
     }
     if (!model) {
-      if (this.editingInteractively) {
-        if (!this.editingVariable) {
-          this.editingVariable = outerWs.createVariable(varName, '');
-        } else {
-          outerWs.renameVariableById(this.editingVariable.getId(), varName);
-        }
-      } else {
-        outerWs.createVariable(varName, '');
+      model = outerWs.createVariable(varName, '');
+      if (model && this.createdVariables_) {
+        this.createdVariables_.push(model);
       }
     }
     return varName;
+  },
+
+  /**
+   * Called when focusing away from the text field.
+   * Deletes all variables that were created as the user typed their intended
+   * variable name.
+   *
+   * @internal
+   * @param  newText The new variable name.
+   */
+  deleteIntermediateVars_: function (
+    this: FieldTextInputForArgument,
+    newText: string,
+  ) {
+    const outerWs = this.getSourceBlock()!.workspace.getRootWorkspace();
+    if (!outerWs) {
+      return;
+    }
+    for (let i = 0; i < this.createdVariables_.length; i++) {
+      const model = this.createdVariables_[i];
+      if (model.name !== newText) {
+        outerWs.deleteVariableById(model.getId());
+      }
+    }
   },
 };
 blocks['procedures_mutatorarg'] = PROCEDURES_MUTATORARGUMENT;
@@ -751,11 +748,12 @@ blocks['procedures_mutatorarg'] = PROCEDURES_MUTATORARGUMENT;
 /** Type of a block using the PROCEDURE_CALL_COMMON mixin. */
 type CallBlock = Block & CallMixin;
 interface CallMixin extends CallMixinType {
-  argumentVarModels_: IVariableModel<IVariableState>[];
+  argumentVarModels_: VariableModel[];
   arguments_: string[];
   defType_: string;
   quarkIds_: string[] | null;
   quarkConnections_: {[id: string]: Connection};
+  previousEnabledState_: boolean;
 }
 type CallMixinType = typeof PROCEDURE_CALL_COMMON;
 
@@ -764,13 +762,6 @@ type CallExtraState = {
   name: string;
   params?: string[];
 };
-
-/**
- * The language-neutral ID for when the reason why a block is disabled is
- * because the block's corresponding procedure definition is disabled.
- */
-const DISABLED_PROCEDURE_DEFINITION_DISABLED_REASON =
-  'DISABLED_PROCEDURE_DEFINITION';
 
 /**
  * Common properties for the procedure_callnoreturn and
@@ -867,7 +858,7 @@ const PROCEDURE_CALL_COMMON = {
         if (
           mutatorOpen &&
           connection &&
-          !paramIds.includes(this.quarkIds_[i])
+          paramIds.indexOf(this.quarkIds_[i]) === -1
         ) {
           // This connection should no longer be attached to this block.
           connection.disconnect();
@@ -930,9 +921,10 @@ const PROCEDURE_CALL_COMMON = {
           type: 'field_label',
           text: this.arguments_[i],
         }) as FieldLabel;
-        this.appendValueInput('ARG' + i)
+        const input = this.appendValueInput('ARG' + i)
           .setAlign(Align.RIGHT)
           .appendField(newField, 'ARGNAME' + i);
+        input.init();
       }
     }
     // Remove deleted inputs.
@@ -945,6 +937,7 @@ const PROCEDURE_CALL_COMMON = {
       if (this.arguments_.length) {
         if (!this.getField('WITH')) {
           topRow.appendField(Msg['PROCEDURES_CALL_BEFORE_PARAMS'], 'WITH');
+          topRow.init();
         }
       } else {
         if (this.getField('WITH')) {
@@ -1030,7 +1023,7 @@ const PROCEDURE_CALL_COMMON = {
    *
    * @returns List of variable models.
    */
-  getVarModels: function (this: CallBlock): IVariableModel<IVariableState>[] {
+  getVarModels: function (this: CallBlock): VariableModel[] {
     return this.argumentVarModels_;
   },
   /**
@@ -1050,7 +1043,7 @@ const PROCEDURE_CALL_COMMON = {
     }
     if (
       event.type === Events.BLOCK_CREATE &&
-      (event as BlockCreate).ids!.includes(this.id)
+      (event as BlockCreate).ids!.indexOf(this.id) !== -1
     ) {
       // Look for the case where a procedure call was created (usually through
       // paste) and there is no matching definition.  In this case, create
@@ -1100,14 +1093,6 @@ const PROCEDURE_CALL_COMMON = {
         xml.appendChild(block);
         Xml.domToWorkspace(xml, this.workspace);
         Events.setGroup(false);
-      } else if (!def.isEnabled()) {
-        this.setDisabledReason(
-          true,
-          DISABLED_PROCEDURE_DEFINITION_DISABLED_REASON,
-        );
-        this.setWarningText(
-          Msg['PROCEDURES_CALL_DISABLED_DEF_WARNING'].replace('%1', name),
-        );
       }
     } else if (event.type === Events.BLOCK_DELETE) {
       // Look for the case where a procedure definition has been deleted,
@@ -1140,16 +1125,12 @@ const PROCEDURE_CALL_COMMON = {
           );
         }
         Events.setGroup(event.group);
-        const valid = def.isEnabled();
-        this.setDisabledReason(
-          !valid,
-          DISABLED_PROCEDURE_DEFINITION_DISABLED_REASON,
-        );
-        this.setWarningText(
-          valid
-            ? null
-            : Msg['PROCEDURES_CALL_DISABLED_DEF_WARNING'].replace('%1', name),
-        );
+        if (blockChangeEvent.newValue) {
+          this.previousEnabledState_ = this.isEnabled();
+          this.setEnabled(false);
+        } else {
+          this.setEnabled(this.previousEnabledState_);
+        }
         Events.setGroup(oldGroup);
       }
     }
@@ -1178,7 +1159,7 @@ const PROCEDURE_CALL_COMMON = {
         const def = Procedures.getDefinition(name, workspace);
         if (def) {
           (workspace as WorkspaceSvg).centerOnBlock(def.id);
-          getFocusManager().focusNode(def as BlockSvg);
+          (def as BlockSvg).select();
         }
       },
     });
@@ -1201,6 +1182,7 @@ blocks['procedures_callnoreturn'] = {
     this.argumentVarModels_ = [];
     this.quarkConnections_ = {};
     this.quarkIds_ = null;
+    this.previousEnabledState_ = true;
   },
 
   defType_: 'procedures_defnoreturn',
@@ -1215,12 +1197,13 @@ blocks['procedures_callreturn'] = {
     this.appendDummyInput('TOPROW').appendField('', 'NAME');
     this.setOutput(true);
     this.setStyle('procedure_blocks');
-    // Tooltip is set in renameProcedure.
+    // Tooltip is set in domToMutation.
     this.setHelpUrl(Msg['PROCEDURES_CALLRETURN_HELPURL']);
     this.arguments_ = [];
     this.argumentVarModels_ = [];
     this.quarkConnections_ = {};
     this.quarkIds_ = null;
+    this.previousEnabledState_ = true;
   },
 
   defType_: 'procedures_defreturn',
@@ -1236,12 +1219,6 @@ interface IfReturnMixin extends IfReturnMixinType {
   hasReturnValue_: boolean;
 }
 type IfReturnMixinType = typeof PROCEDURES_IFRETURN;
-
-/**
- * The language-neutral ID for when the reason why a block is disabled is
- * because the block is only valid inside of a procedure body.
- */
-const UNPARENTED_IFRETURN_DISABLED_REASON = 'UNPARENTED_IFRETURN';
 
 const PROCEDURES_IFRETURN = {
   /**
@@ -1303,7 +1280,7 @@ const PROCEDURES_IFRETURN = {
     if (
       ((this.workspace as WorkspaceSvg).isDragging &&
         (this.workspace as WorkspaceSvg).isDragging()) ||
-      (e.type !== Events.BLOCK_MOVE && e.type !== Events.BLOCK_CREATE)
+      e.type !== Events.BLOCK_MOVE
     ) {
       return; // Don't change state at the start of a drag.
     }
@@ -1311,7 +1288,7 @@ const PROCEDURES_IFRETURN = {
     // Is the block nested in a procedure?
     let block = this; // eslint-disable-line @typescript-eslint/no-this-alias
     do {
-      if (this.FUNCTION_TYPES.includes(block.type)) {
+      if (this.FUNCTION_TYPES.indexOf(block.type) !== -1) {
         legal = true;
         break;
       }
@@ -1339,16 +1316,12 @@ const PROCEDURES_IFRETURN = {
     } else {
       this.setWarningText(Msg['PROCEDURES_IFRETURN_WARNING']);
     }
-
     if (!this.isInFlyout) {
-      try {
-        // There is no need to record the enable/disable change on the undo/redo
-        // list since the change will be automatically recreated when replayed.
-        eventUtils.setRecordUndo(false);
-        this.setDisabledReason(!legal, UNPARENTED_IFRETURN_DISABLED_REASON);
-      } finally {
-        eventUtils.setRecordUndo(true);
-      }
+      const group = Events.getGroup();
+      // Makes it so the move and the disable event get undone together.
+      Events.setGroup(e.group);
+      this.setEnabled(legal);
+      Events.setGroup(group);
     }
   },
   /**

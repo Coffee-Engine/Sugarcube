@@ -27,6 +27,7 @@ export class FieldImage extends Field<string> {
    * of the field.
    */
   private static readonly Y_PADDING = 1;
+  protected override size_: Size;
   protected readonly imageHeight: number;
 
   /** The function to be called when this field is clicked. */
@@ -150,10 +151,6 @@ export class FieldImage extends Field<string> {
       this.value_ as string,
     );
 
-    if (this.fieldGroup_) {
-      dom.addClass(this.fieldGroup_, 'blocklyImageField');
-    }
-
     if (this.clickHandler) {
       this.imageElement.style.cursor = 'pointer';
     }
@@ -213,17 +210,6 @@ export class FieldImage extends Field<string> {
   }
 
   /**
-   * Check whether this field should be clickable.
-   *
-   * @returns Whether this field is clickable.
-   */
-  isClickable(): boolean {
-    // Images are only clickable if they have a click handler and fulfill the
-    // contract to be clickable: enabled and attached to an editable block.
-    return super.isClickable() && !!this.clickHandler;
-  }
-
-  /**
    * If field click is called, and click handler defined,
    * call the handler.
    */
@@ -264,7 +250,7 @@ export class FieldImage extends Field<string> {
    * @nocollapse
    * @internal
    */
-  static override fromJson(options: FieldImageFromJsonConfig): FieldImage {
+  static fromJson(options: FieldImageFromJsonConfig): FieldImage {
     if (!options.src || !options.width || !options.height) {
       throw new Error(
         'src, width, and height values for an image field are' +
@@ -298,7 +284,7 @@ export interface FieldImageConfig extends FieldConfig {
 }
 
 /**
- * fromJson config options for the image field.
+ * fromJson config options for the colour field.
  */
 export interface FieldImageFromJsonConfig extends FieldImageConfig {
   src?: string;

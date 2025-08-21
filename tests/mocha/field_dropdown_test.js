@@ -5,17 +5,16 @@
  */
 
 import * as Blockly from '../../build/src/core/blockly.js';
-import {assert} from '../../node_modules/chai/chai.js';
-import {
-  createTestBlock,
-  defineRowBlock,
-} from './test_helpers/block_definitions.js';
 import {
   assertFieldValue,
   runConstructorSuiteTests,
   runFromJsonSuiteTests,
   runSetValueTests,
 } from './test_helpers/fields.js';
+import {
+  createTestBlock,
+  defineRowBlock,
+} from './test_helpers/block_definitions.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
@@ -92,9 +91,9 @@ suite('Dropdown Fields', function () {
       expectedText: 'a',
       args: [
         [
-          [{src: 'scrA', alt: 'a', width: 10, height: 10}, 'A'],
-          [{src: 'scrB', alt: 'b', width: 10, height: 10}, 'B'],
-          [{src: 'scrC', alt: 'c', width: 10, height: 10}, 'C'],
+          [{src: 'scrA', alt: 'a'}, 'A'],
+          [{src: 'scrB', alt: 'b'}, 'B'],
+          [{src: 'scrC', alt: 'c'}, 'C'],
         ],
       ],
     },
@@ -121,9 +120,9 @@ suite('Dropdown Fields', function () {
       args: [
         () => {
           return [
-            [{src: 'scrA', alt: 'a', width: 10, height: 10}, 'A'],
-            [{src: 'scrB', alt: 'b', width: 10, height: 10}, 'B'],
-            [{src: 'scrC', alt: 'c', width: 10, height: 10}, 'C'],
+            [{src: 'scrA', alt: 'a'}, 'A'],
+            [{src: 'scrB', alt: 'b'}, 'B'],
+            [{src: 'scrC', alt: 'c'}, 'C'],
           ];
         },
       ],
@@ -195,52 +194,6 @@ suite('Dropdown Fields', function () {
       assertFieldValue(this.field, 'B', 'b');
     });
   });
-  suite('setOptions', function () {
-    setup(function () {
-      this.field = new Blockly.FieldDropdown([
-        ['a', 'A'],
-        ['b', 'B'],
-        ['c', 'C'],
-      ]);
-    });
-    test('With array updates options', function () {
-      this.field.setOptions([
-        ['d', 'D'],
-        ['e', 'E'],
-        ['f', 'F'],
-      ]);
-      assertFieldValue(this.field, 'D', 'd');
-    });
-    test('With generator updates options', function () {
-      this.field.setOptions(function () {
-        return [
-          ['d', 'D'],
-          ['e', 'E'],
-          ['f', 'F'],
-        ];
-      });
-      assertFieldValue(this.field, 'D', 'd');
-    });
-    test('With trimmable options gets trimmed', function () {
-      this.field.setOptions([
-        ['a d b', 'D'],
-        ['a e b', 'E'],
-        ['a f b', 'F'],
-      ]);
-      assert.deepEqual(this.field.prefixField, 'a');
-      assert.deepEqual(this.field.suffixField, 'b');
-      assert.deepEqual(this.field.getOptions(), [
-        ['d', 'D'],
-        ['e', 'E'],
-        ['f', 'F'],
-      ]);
-    });
-    test('With an empty array of options throws', function () {
-      assert.throws(function () {
-        this.field.setOptions([]);
-      });
-    });
-  });
 
   suite('Validators', function () {
     setup(function () {
@@ -299,7 +252,7 @@ suite('Dropdown Fields', function () {
         field.setValue(value);
         block.getInput('INPUT').appendField(field, 'DROPDOWN');
         const jso = Blockly.serialization.blocks.save(block);
-        assert.deepEqual(jso['fields'], {'DROPDOWN': value});
+        chai.assert.deepEqual(jso['fields'], {'DROPDOWN': value});
       };
     });
 

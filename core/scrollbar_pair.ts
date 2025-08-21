@@ -27,7 +27,7 @@ export class ScrollbarPair {
   corner_: SVGRectElement | null = null;
 
   /** Previously recorded metrics from the workspace. */
-  private oldHostMetrics: Metrics | null = null;
+  private oldHostMetrics_: Metrics | null = null;
 
   /**
    * @param workspace Workspace to bind the scrollbars to.
@@ -84,7 +84,7 @@ export class ScrollbarPair {
   dispose() {
     dom.removeNode(this.corner_);
     this.corner_ = null;
-    this.oldHostMetrics = null;
+    this.oldHostMetrics_ = null;
     if (this.hScroll) {
       this.hScroll.dispose();
       this.hScroll = null;
@@ -111,11 +111,11 @@ export class ScrollbarPair {
     let resizeH = false;
     let resizeV = false;
     if (
-      !this.oldHostMetrics ||
-      this.oldHostMetrics.viewWidth !== hostMetrics.viewWidth ||
-      this.oldHostMetrics.viewHeight !== hostMetrics.viewHeight ||
-      this.oldHostMetrics.absoluteTop !== hostMetrics.absoluteTop ||
-      this.oldHostMetrics.absoluteLeft !== hostMetrics.absoluteLeft
+      !this.oldHostMetrics_ ||
+      this.oldHostMetrics_.viewWidth !== hostMetrics.viewWidth ||
+      this.oldHostMetrics_.viewHeight !== hostMetrics.viewHeight ||
+      this.oldHostMetrics_.absoluteTop !== hostMetrics.absoluteTop ||
+      this.oldHostMetrics_.absoluteLeft !== hostMetrics.absoluteLeft
     ) {
       // The window has been resized or repositioned.
       resizeH = true;
@@ -123,18 +123,18 @@ export class ScrollbarPair {
     } else {
       // Has the content been resized or moved?
       if (
-        !this.oldHostMetrics ||
-        this.oldHostMetrics.scrollWidth !== hostMetrics.scrollWidth ||
-        this.oldHostMetrics.viewLeft !== hostMetrics.viewLeft ||
-        this.oldHostMetrics.scrollLeft !== hostMetrics.scrollLeft
+        !this.oldHostMetrics_ ||
+        this.oldHostMetrics_.scrollWidth !== hostMetrics.scrollWidth ||
+        this.oldHostMetrics_.viewLeft !== hostMetrics.viewLeft ||
+        this.oldHostMetrics_.scrollLeft !== hostMetrics.scrollLeft
       ) {
         resizeH = true;
       }
       if (
-        !this.oldHostMetrics ||
-        this.oldHostMetrics.scrollHeight !== hostMetrics.scrollHeight ||
-        this.oldHostMetrics.viewTop !== hostMetrics.viewTop ||
-        this.oldHostMetrics.scrollTop !== hostMetrics.scrollTop
+        !this.oldHostMetrics_ ||
+        this.oldHostMetrics_.scrollHeight !== hostMetrics.scrollHeight ||
+        this.oldHostMetrics_.viewTop !== hostMetrics.viewTop ||
+        this.oldHostMetrics_.scrollTop !== hostMetrics.scrollTop
       ) {
         resizeV = true;
       }
@@ -158,23 +158,23 @@ export class ScrollbarPair {
     if (this.hScroll && this.vScroll) {
       // Reposition the corner square.
       if (
-        !this.oldHostMetrics ||
-        this.oldHostMetrics.viewWidth !== hostMetrics.viewWidth ||
-        this.oldHostMetrics.absoluteLeft !== hostMetrics.absoluteLeft
+        !this.oldHostMetrics_ ||
+        this.oldHostMetrics_.viewWidth !== hostMetrics.viewWidth ||
+        this.oldHostMetrics_.absoluteLeft !== hostMetrics.absoluteLeft
       ) {
         this.corner_?.setAttribute('x', String(this.vScroll.position.x));
       }
       if (
-        !this.oldHostMetrics ||
-        this.oldHostMetrics.viewHeight !== hostMetrics.viewHeight ||
-        this.oldHostMetrics.absoluteTop !== hostMetrics.absoluteTop
+        !this.oldHostMetrics_ ||
+        this.oldHostMetrics_.viewHeight !== hostMetrics.viewHeight ||
+        this.oldHostMetrics_.absoluteTop !== hostMetrics.absoluteTop
       ) {
         this.corner_?.setAttribute('y', String(this.hScroll.position.y));
       }
     }
 
     // Cache the current metrics to potentially short-cut the next resize event.
-    this.oldHostMetrics = hostMetrics;
+    this.oldHostMetrics_ = hostMetrics;
   }
 
   /**

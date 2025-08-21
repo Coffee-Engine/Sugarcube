@@ -30,9 +30,11 @@ import {SquareCorner} from '../measurables/square_corner.js';
 import {StatementInput} from '../measurables/statement_input.js';
 import {TopRow} from '../measurables/top_row.js';
 import {Types} from '../measurables/types.js';
+
 import {Drawer} from './drawer.js';
 import type {IPathObject} from './i_path_object.js';
 import {RenderInfo} from './info.js';
+import {MarkerSvg} from './marker_svg.js';
 import {PathObject} from './path_object.js';
 import {Renderer} from './renderer.js';
 
@@ -43,10 +45,7 @@ import {Renderer} from './renderer.js';
  * @param rendererClass The new renderer class to register.
  * @throws {Error} if a renderer with the same name has already been registered.
  */
-export function register(
-  name: string,
-  rendererClass: new (name: string) => Renderer,
-) {
+export function register(name: string, rendererClass: Function) {
   registry.register(registry.Type.RENDERER, name, rendererClass);
 }
 
@@ -79,44 +78,43 @@ export function init(
   renderer.init(theme, opt_rendererOverrides);
   return renderer;
 }
-export {
-  BottomRow,
-  Connection,
-  Drawer,
-  ExternalValueInput,
-  Field,
-  Hat,
-  Icon,
-  InlineInput,
-  InputConnection,
-  InputRow,
-  InRowSpacer,
-  IPathObject,
-  JaggedEdge,
-  Measurable,
-  NextConnection,
-  OutputConnection,
-  PathObject,
-  PreviousConnection,
-  Renderer,
-  RenderInfo,
-  RoundCorner,
-  Row,
-  SpacerRow,
-  SquareCorner,
-  StatementInput,
-  TopRow,
-  Types,
-};
+export {BottomRow};
+export {Connection};
+export {Drawer};
+export {ExternalValueInput};
+export {Field};
+export {Hat};
+export {Icon};
+export {InRowSpacer};
+export {InlineInput};
+export {InputConnection};
+export {InputRow};
+export {IPathObject};
+export {JaggedEdge};
+export {MarkerSvg};
+export {Measurable};
+export {NextConnection};
+export {OutputConnection};
+export {PathObject};
+export {PreviousConnection};
+export {Renderer};
+export {RenderInfo};
+export {RoundCorner};
+export {Row};
+export {SpacerRow};
+export {SquareCorner};
+export {StatementInput};
+export {TopRow};
+export {Types};
 
 export {
-  BaseShape,
-  ConstantProvider,
-  DynamicShape,
-  InsideCorners,
-  JaggedTeeth,
-  Notch,
   OutsideCorners,
-  PuzzleTab,
+  InsideCorners,
   StartHat,
+  Notch,
+  PuzzleTab,
+  JaggedTeeth,
+  BaseShape,
+  DynamicShape,
+  ConstantProvider,
 } from './constants.js';

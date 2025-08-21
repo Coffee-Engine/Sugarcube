@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../node_modules/chai/chai.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
@@ -78,7 +77,7 @@ suite('InsertionMarkers', function () {
         const block = this.workspace.getBlockById('insertion');
         block.isInsertionMarker_ = true;
         const code = javascriptGenerator.workspaceToCode(this.workspace);
-        assert.equal(code, expectedCode);
+        chai.assert.equal(code, expectedCode);
       };
     });
     teardown(function () {
@@ -228,7 +227,7 @@ suite('InsertionMarkers', function () {
         let xml = Blockly.Xml.workspaceToDom(this.workspace);
         Blockly.Xml.domToWorkspace(xml, this.workspace);
         xml = Blockly.Xml.domToText(xml);
-        assert.equal(xml, expectXml);
+        chai.assert.equal(xml, expectXml);
       };
     });
     test('Marker Surrounds', function () {

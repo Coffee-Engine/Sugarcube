@@ -20,8 +20,3 @@ export interface IAutoHideable extends IComponent {
    */
   autoHide(onlyClosePopups: boolean): void;
 }
-
-/** Returns true if the given object is autohideable. */
-export function isAutoHideable(obj: any): obj is IAutoHideable {
-  return obj && typeof obj.autoHide === 'function';
-}

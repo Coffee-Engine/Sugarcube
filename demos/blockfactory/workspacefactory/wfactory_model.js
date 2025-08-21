@@ -395,7 +395,7 @@ WorkspaceFactoryModel.prototype.getAllUsedBlockTypes = function() {
     // Add block types if not already in list.
     for (var i = 0; i < blocks.length; i++) {
       var type = blocks[i].getAttribute('type');
-      if (!list.includes(type)) {
+      if (list.indexOf(type) === -1) {
         list.push(type);
       }
     }
@@ -444,9 +444,9 @@ WorkspaceFactoryModel.prototype.updateLibBlockTypes = function(blockTypes) {
  */
 WorkspaceFactoryModel.prototype.isDefinedBlockType = function(blockType) {
   var isStandardBlock =
-      StandardCategories.coreBlockTypes.includes(blockType);
-  var isLibBlock = this.libBlockTypes.includes(blockType);
-  var isImportedBlock = this.importedBlockTypes.includes(blockType);
+      StandardCategories.coreBlockTypes.indexOf(blockType) !== -1;
+  var isLibBlock = this.libBlockTypes.indexOf(blockType) !== -1;
+  var isImportedBlock = this.importedBlockTypes.indexOf(blockType) !== -1;
   return (isStandardBlock || isLibBlock || isImportedBlock);
 };
 

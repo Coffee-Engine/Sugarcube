@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {State} from '../serialization/procedures.js';
 import {IParameterModel} from './i_parameter_model.js';
 
 /**
@@ -61,11 +60,4 @@ export interface IProcedureModel {
    * disabled, all procedure caller blocks should be disabled as well.
    */
   getEnabled(): boolean;
-
-  /**
-   * Serializes the state of the procedure to JSON.
-   *
-   * @returns JSON serializable state of the procedure.
-   */
-  saveState(): State;
 }

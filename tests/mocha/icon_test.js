@@ -4,13 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../node_modules/chai/chai.js';
-import {defineEmptyBlock} from './test_helpers/block_definitions.js';
-import {MockIcon, MockSerializableIcon} from './test_helpers/icon_mocks.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
 } from './test_helpers/setup_teardown.js';
+import {defineEmptyBlock} from './test_helpers/block_definitions.js';
+import {MockIcon, MockSerializableIcon} from './test_helpers/icon_mocks.js';
 
 suite('Icon', function () {
   setup(function () {
@@ -63,9 +62,27 @@ suite('Icon', function () {
 
         block.addIcon(icon);
 
-        assert.isFalse(
+        chai.assert.isFalse(
           initViewSpy.called,
           'Expected initView to not be called',
+        );
+      });
+
+      test('initView is called by headful blocks during initSvg', function () {
+        const workspace = createWorkspaceSvg();
+        const block = createUninitializedBlock(workspace);
+        const icon = new MockIcon();
+        const initViewSpy = sinon.spy(icon, 'initView');
+
+        block.addIcon(icon);
+        chai.assert.isFalse(
+          initViewSpy.called,
+          'Expected initView to not be called before initing svg',
+        );
+        block.initSvg();
+        chai.assert.isTrue(
+          initViewSpy.calledOnce,
+          'Expected initView to be called',
         );
       });
 
@@ -80,7 +97,7 @@ suite('Icon', function () {
           const initViewSpy = sinon.spy(icon, 'initView');
 
           block.addIcon(icon);
-          assert.isTrue(
+          chai.assert.isTrue(
             initViewSpy.calledOnce,
             'Expected initView to be called',
           );
@@ -97,9 +114,27 @@ suite('Icon', function () {
 
         block.addIcon(icon);
 
-        assert.isFalse(
+        chai.assert.isFalse(
           applyColourSpy.called,
           'Expected applyColour to not be called',
+        );
+      });
+
+      test('applyColour is called by headful blocks during initSvg', function () {
+        const workspace = createWorkspaceSvg();
+        const block = createUninitializedBlock(workspace);
+        const icon = new MockIcon();
+        const applyColourSpy = sinon.spy(icon, 'applyColour');
+
+        block.addIcon(icon);
+        chai.assert.isFalse(
+          applyColourSpy.called,
+          'Expected applyCOlour to not be called before initing svg',
+        );
+        block.initSvg();
+        chai.assert.isTrue(
+          applyColourSpy.calledOnce,
+          'Expected applyColour to be called',
         );
       });
 
@@ -113,7 +148,7 @@ suite('Icon', function () {
           const applyColourSpy = sinon.spy(icon, 'applyColour');
 
           block.addIcon(icon);
-          assert.isTrue(
+          chai.assert.isTrue(
             applyColourSpy.calledOnce,
             'Expected applyColour to be called',
           );
@@ -129,7 +164,7 @@ suite('Icon', function () {
         block.addIcon(icon);
         applyColourSpy.resetHistory();
         block.setColour('#cccccc');
-        assert.isTrue(
+        chai.assert.isTrue(
           applyColourSpy.calledOnce,
           'Expected applyColour to be called',
         );
@@ -144,7 +179,7 @@ suite('Icon', function () {
         block.addIcon(icon);
         applyColourSpy.resetHistory();
         block.setStyle('logic_block');
-        assert.isTrue(
+        chai.assert.isTrue(
           applyColourSpy.calledOnce,
           'Expected applyColour to be called',
         );
@@ -158,8 +193,8 @@ suite('Icon', function () {
 
         block.addIcon(icon);
         applyColourSpy.resetHistory();
-        block.setDisabledReason(true, 'test reason');
-        assert.isTrue(
+        block.setEnabled(false);
+        chai.assert.isTrue(
           applyColourSpy.calledOnce,
           'Expected applyColour to be called',
         );
@@ -174,7 +209,7 @@ suite('Icon', function () {
         block.addIcon(icon);
         applyColourSpy.resetHistory();
         block.setShadow(true);
-        assert.isTrue(
+        chai.assert.isTrue(
           applyColourSpy.calledOnce,
           'Expected applyColour to be called',
         );
@@ -190,9 +225,27 @@ suite('Icon', function () {
 
         block.addIcon(icon);
 
-        assert.isFalse(
+        chai.assert.isFalse(
           updateEditableSpy.called,
           'Expected updateEditable to not be called',
+        );
+      });
+
+      test('updateEditable is called by headful blocks during initSvg', function () {
+        const workspace = createWorkspaceSvg();
+        const block = createUninitializedBlock(workspace);
+        const icon = new MockIcon();
+        const updateEditableSpy = sinon.spy(icon, 'updateEditable');
+
+        block.addIcon(icon);
+        chai.assert.isFalse(
+          updateEditableSpy.called,
+          'Expected updateEditable to not be called before initing svg',
+        );
+        block.initSvg();
+        chai.assert.isTrue(
+          updateEditableSpy.calledOnce,
+          'Expected updateEditable to be called',
         );
       });
 
@@ -206,7 +259,7 @@ suite('Icon', function () {
           const updateEditableSpy = sinon.spy(icon, 'updateEditable');
 
           block.addIcon(icon);
-          assert.isTrue(
+          chai.assert.isTrue(
             updateEditableSpy.calledOnce,
             'Expected updateEditable to be called',
           );
@@ -222,7 +275,7 @@ suite('Icon', function () {
         block.addIcon(icon);
         updateEditableSpy.resetHistory();
         block.setEditable(false);
-        assert.isTrue(
+        chai.assert.isTrue(
           updateEditableSpy.calledOnce,
           'Expected updateEditable to be called',
         );
@@ -238,7 +291,7 @@ suite('Icon', function () {
         block.setEditable(false);
         updateEditableSpy.resetHistory();
         block.setEditable(true);
-        assert.isTrue(
+        chai.assert.isTrue(
           updateEditableSpy.calledOnce,
           'Expected updateEditable to be called',
         );
@@ -256,7 +309,7 @@ suite('Icon', function () {
         block.setCollapsed(true);
         block.setCollapsed(false);
 
-        assert.isFalse(
+        chai.assert.isFalse(
           updateCollapsedSpy.called,
           'Expected updateCollapsed to not be called',
         );
@@ -273,7 +326,7 @@ suite('Icon', function () {
         block.setCollapsed(true);
         this.clock.runAll();
 
-        assert.isTrue(
+        chai.assert.isTrue(
           updateCollapsedSpy.called,
           'Expected updateCollapsed to be called',
         );
@@ -290,7 +343,7 @@ suite('Icon', function () {
         block.setCollapsed(false);
         this.clock.runAll();
 
-        assert.isTrue(
+        chai.assert.isTrue(
           updateCollapsedSpy.called,
           'Expected updateCollapsed to be called',
         );
@@ -303,7 +356,7 @@ suite('Icon', function () {
       const block = createHeadlessBlock(createHeadlessWorkspace());
       block.addIcon(new MockSerializableIcon());
       const json = Blockly.serialization.blocks.save(block);
-      assert.deepNestedInclude(
+      chai.assert.deepNestedInclude(
         json,
         {'icons': {'serializable icon': 'some state'}},
         'Expected the JSON to include the saved state of the ' +
@@ -315,7 +368,7 @@ suite('Icon', function () {
       const block = createHeadlessBlock(createHeadlessWorkspace());
       block.addIcon(new MockNonSerializableIcon());
       const json = Blockly.serialization.blocks.save(block);
-      assert.notProperty(
+      chai.assert.notProperty(
         json,
         'icons',
         'Expected the JSON to not include any saved state for icons',
@@ -338,7 +391,7 @@ suite('Icon', function () {
         },
       };
       const block = Blockly.serialization.blocks.append(json, workspace);
-      assert.equal(
+      chai.assert.equal(
         block.getIcon('serializable icon').state,
         'some state',
         'Expected the icon to have been properly instantiated and ' +
@@ -356,7 +409,7 @@ suite('Icon', function () {
           'serializable icon': 'some state',
         },
       };
-      assert.throws(
+      chai.assert.throws(
         () => {
           Blockly.serialization.blocks.append(json, workspace);
         },

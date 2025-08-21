@@ -40,7 +40,7 @@ function svgToPng_(data, width, height, callback) {
       const dataUri = canvas.toDataURL('image/png');
       callback(dataUri);
     } catch (err) {
-      console.warn('Error converting the workspace svg to a png: ' + err);
+      console.warn('Error converting the workspace svg to a png');
       callback('');
     }
   };
@@ -89,7 +89,8 @@ function workspaceToSvg_(workspace, callback, customCss) {
   const css = [].slice
     .call(document.head.querySelectorAll('style'))
     .filter(
-      (el) => /\.blocklySvg/.test(el.innerText) || el.id.startsWith('blockly-'),
+      (el) =>
+        /\.blocklySvg/.test(el.innerText) || el.id.indexOf('blockly-') === 0,
     )
     .map((el) => el.innerText)
     .join('\n');

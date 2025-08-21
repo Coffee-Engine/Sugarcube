@@ -22,64 +22,42 @@ import type {Block} from './block.js';
 import type {BlockSvg} from './block_svg.js';
 import type {BlocklyOptions} from './blockly_options.js';
 import * as browserEvents from './browser_events.js';
-import {COMMENT_COLLAPSE_BAR_BUTTON_FOCUS_IDENTIFIER} from './comments/collapse_comment_bar_button.js';
-import {COMMENT_EDITOR_FOCUS_IDENTIFIER} from './comments/comment_editor.js';
-import {COMMENT_DELETE_BAR_BUTTON_FOCUS_IDENTIFIER} from './comments/delete_comment_bar_button.js';
-import {RenderedWorkspaceComment} from './comments/rendered_workspace_comment.js';
-import {WorkspaceComment} from './comments/workspace_comment.js';
 import * as common from './common.js';
 import {ComponentManager} from './component_manager.js';
+import {config} from './config.js';
 import {ConnectionDB} from './connection_db.js';
 import * as ContextMenu from './contextmenu.js';
-import {
-  ContextMenuOption,
-  ContextMenuRegistry,
-} from './contextmenu_registry.js';
+import {ContextMenuRegistry} from './contextmenu_registry.js';
 import * as dropDownDiv from './dropdowndiv.js';
-import {Abstract as AbstractEvent} from './events/events.js';
-import {EventType} from './events/type.js';
 import * as eventUtils from './events/utils.js';
-import {Flyout} from './flyout_base.js';
 import type {FlyoutButton} from './flyout_button.js';
-import {getFocusManager} from './focus_manager.js';
 import {Gesture} from './gesture.js';
 import {Grid} from './grid.js';
-import {MutatorIcon} from './icons/mutator_icon.js';
-import {isAutoHideable} from './interfaces/i_autohideable.js';
+import type {IASTNodeLocationSvg} from './interfaces/i_ast_node_location_svg.js';
 import type {IBoundedElement} from './interfaces/i_bounded_element.js';
-import {IContextMenu} from './interfaces/i_contextmenu.js';
+import type {ICopyData, ICopyable} from './interfaces/i_copyable.js';
 import type {IDragTarget} from './interfaces/i_drag_target.js';
 import type {IFlyout} from './interfaces/i_flyout.js';
-import {
-  isFocusableNode,
-  type IFocusableNode,
-} from './interfaces/i_focusable_node.js';
-import type {IFocusableTree} from './interfaces/i_focusable_tree.js';
-import {hasBubble} from './interfaces/i_has_bubble.js';
 import type {IMetricsManager} from './interfaces/i_metrics_manager.js';
 import type {IToolbox} from './interfaces/i_toolbox.js';
-import type {LineCursor} from './keyboard_nav/line_cursor.js';
+import type {Cursor} from './keyboard_nav/cursor.js';
 import type {Marker} from './keyboard_nav/marker.js';
-import {LayerManager} from './layer_manager.js';
 import {MarkerManager} from './marker_manager.js';
-import {Msg} from './msg.js';
-import {Navigator} from './navigator.js';
 import {Options} from './options.js';
 import * as Procedures from './procedures.js';
 import * as registry from './registry.js';
 import * as blockRendering from './renderers/common/block_rendering.js';
 import type {Renderer} from './renderers/common/renderer.js';
 import type {ScrollbarPair} from './scrollbar_pair.js';
+import * as blocks from './serialization/blocks.js';
 import type {Theme} from './theme.js';
 import {Classic} from './theme/classic.js';
 import {ThemeManager} from './theme_manager.js';
 import * as Tooltip from './tooltip.js';
 import type {Trashcan} from './trashcan.js';
-import * as aria from './utils/aria.js';
 import * as arrayUtils from './utils/array.js';
 import {Coordinate} from './utils/coordinate.js';
 import * as dom from './utils/dom.js';
-import * as drag from './utils/drag.js';
 import type {Metrics} from './utils/metrics.js';
 import {Rect} from './utils/rect.js';
 import {Size} from './utils/size.js';
@@ -87,12 +65,20 @@ import {Svg} from './utils/svg.js';
 import * as svgMath from './utils/svg_math.js';
 import * as toolbox from './utils/toolbox.js';
 import * as userAgent from './utils/useragent.js';
+import type {VariableModel} from './variable_model.js';
 import * as Variables from './variables.js';
 import * as VariablesDynamic from './variables_dynamic.js';
 import * as WidgetDiv from './widgetdiv.js';
 import {Workspace} from './workspace.js';
 import {WorkspaceAudio} from './workspace_audio.js';
+import {WorkspaceComment} from './workspace_comment.js';
+import {WorkspaceCommentSvg} from './workspace_comment_svg.js';
+import * as Xml from './xml.js';
 import {ZoomControls} from './zoom_controls.js';
+import {ContextMenuOption} from './contextmenu_registry.js';
+import * as renderManagement from './render_management.js';
+import * as deprecation from './utils/deprecation.js';
+import {LayerManager} from './layer_manager.js';
 
 /** Margin around the top/bottom/left/right after a zoomToFit call. */
 const ZOOM_TO_FIT_MARGIN = 20;
@@ -101,10 +87,7 @@ const ZOOM_TO_FIT_MARGIN = 20;
  * Class for a workspace.  This is an onscreen area with optional trashcan,
  * scrollbars, bubbles, and dragging.
  */
-export class WorkspaceSvg
-  extends Workspace
-  implements IContextMenu, IFocusableNode, IFocusableTree
-{
+export class WorkspaceSvg extends Workspace implements IASTNodeLocationSvg {
   /**
    * A wrapper function called when a resize event occurs.
    * You can pass the result to `eventHandling.unbind`.
@@ -122,7 +105,7 @@ export class WorkspaceSvg
    * Whether the workspace is visible.  False if the workspace has been hidden
    * by calling `setVisible(false)`.
    */
-  private visible = true;
+  private isVisible_ = true;
 
   /**
    * Whether this workspace has resizes enabled.
@@ -200,6 +183,9 @@ export class WorkspaceSvg
   /** Vertical scroll value when scrolling started in pixel units. */
   startScrollY = 0;
 
+  /** Distance from mouse to object being dragged. */
+  private dragDeltaXY: Coordinate | null = null;
+
   /** Current scale. */
   scale = 1;
 
@@ -227,7 +213,7 @@ export class WorkspaceSvg
    * Category-based toolbox providing blocks which may be dragged into this
    * workspace.
    */
-  private toolbox: IToolbox | null = null;
+  private toolbox_: IToolbox | null = null;
 
   /**
    * The current gesture in progress on this workspace, if any.
@@ -240,7 +226,7 @@ export class WorkspaceSvg
    * The first parent div with 'injectionDiv' in the name, or null if not set.
    * Access this with getInjectionDiv.
    */
-  private injectionDiv: HTMLElement | null = null;
+  private injectionDiv: Element | null = null;
 
   /**
    * Last known position of the page scroll.
@@ -319,9 +305,6 @@ export class WorkspaceSvg
   /** True if keyboard accessibility mode is on, false otherwise. */
   keyboardAccessibilityMode = false;
 
-  /** True iff a keyboard-initiated move ("drag") is in progress. */
-  keyboardMoveInProgress = false; // TODO(#8960): Delete this.
-
   /** The list of top-level bounded elements on the workspace. */
   private topBoundedElements: IBoundedElement[] = [];
 
@@ -339,12 +322,6 @@ export class WorkspaceSvg
   // TODO(b/109816955): remove '!', see go/strict-prop-init-fix.
   svgBubbleCanvas_!: SVGElement;
   zoomControls_: ZoomControls | null = null;
-
-  /**
-   * Navigator that handles moving focus between items in this workspace in
-   * response to keyboard navigation commands.
-   */
-  private navigator = new Navigator();
 
   /**
    * @param options Dictionary of options.
@@ -367,7 +344,7 @@ export class WorkspaceSvg
 
     /** Translates the workspace. */
     this.setMetrics =
-      options.setMetrics || WorkspaceSvg.setTopLevelWorkspaceMetrics;
+      options.setMetrics || WorkspaceSvg.setTopLevelWorkspaceMetrics_;
 
     this.componentManager = new ComponentManager();
 
@@ -388,30 +365,27 @@ export class WorkspaceSvg
     /** Manager in charge of markers and cursors. */
     this.markerManager = new MarkerManager(this);
 
-    if (Variables && Variables.internalFlyoutCategory) {
+    if (Variables && Variables.flyoutCategory) {
       this.registerToolboxCategoryCallback(
         Variables.CATEGORY_NAME,
-        Variables.internalFlyoutCategory,
+        Variables.flyoutCategory,
       );
     }
 
-    if (VariablesDynamic && VariablesDynamic.internalFlyoutCategory) {
+    if (VariablesDynamic && VariablesDynamic.flyoutCategory) {
       this.registerToolboxCategoryCallback(
         VariablesDynamic.CATEGORY_NAME,
-        VariablesDynamic.internalFlyoutCategory,
+        VariablesDynamic.flyoutCategory,
       );
     }
 
-    if (Procedures && Procedures.internalFlyoutCategory) {
+    if (Procedures && Procedures.flyoutCategory) {
       this.registerToolboxCategoryCallback(
         Procedures.CATEGORY_NAME,
-        Procedures.internalFlyoutCategory,
+        Procedures.flyoutCategory,
       );
       this.addChangeListener(Procedures.mutatorOpenListener);
     }
-
-    // Set up callbacks to refresh the toolbox when variables change
-    this.addChangeListener(this.variableChangeCallback.bind(this));
 
     /** Object in charge of storing and updating the workspace theme. */
     this.themeManager_ = this.options.parentWorkspace
@@ -472,6 +446,28 @@ export class WorkspaceSvg
   }
 
   /**
+   * Add the cursor SVG to this workspaces SVG group.
+   *
+   * @param cursorSvg The SVG root of the cursor to be added to the workspace
+   *     SVG group.
+   * @internal
+   */
+  setCursorSvg(cursorSvg: SVGElement) {
+    this.markerManager.setCursorSvg(cursorSvg);
+  }
+
+  /**
+   * Add the marker SVG to this workspaces SVG group.
+   *
+   * @param markerSvg The SVG root of the marker to be added to the workspace
+   *     SVG group.
+   * @internal
+   */
+  setMarkerSvg(markerSvg: SVGElement) {
+    this.markerManager.setMarkerSvg(markerSvg);
+  }
+
+  /**
    * Get the marker with the given ID.
    *
    * @param id The ID of the marker.
@@ -480,7 +476,10 @@ export class WorkspaceSvg
    * @internal
    */
   getMarker(id: string): Marker | null {
-    return this.markerManager.getMarker(id);
+    if (this.markerManager) {
+      return this.markerManager.getMarker(id);
+    }
+    return null;
   }
 
   /**
@@ -488,8 +487,11 @@ export class WorkspaceSvg
    *
    * @returns The cursor for the workspace.
    */
-  getCursor(): LineCursor {
-    return this.markerManager.getCursor();
+  getCursor(): Cursor | null {
+    if (this.markerManager) {
+      return this.markerManager.getCursor();
+    }
+    return null;
   }
 
   /**
@@ -538,23 +540,20 @@ export class WorkspaceSvg
    */
   refreshTheme() {
     if (this.svgGroup_) {
-      const isParentWorkspace = this.options.parentWorkspace === null;
-      this.renderer.refreshDom(
-        this.svgGroup_,
-        this.getTheme(),
-        isParentWorkspace ? this.getInjectionDiv() : undefined,
-      );
+      this.renderer.refreshDom(this.svgGroup_, this.getTheme());
     }
 
     // Update all blocks in workspace that have a style name.
-    this.updateBlockStyles(
-      this.getAllBlocks(false).filter((block) => !!block.getStyleName()),
+    this.updateBlockStyles_(
+      this.getAllBlocks(false).filter(function (block) {
+        return !!block.getStyleName();
+      }),
     );
 
     // Update current toolbox selection.
     this.refreshToolboxSelection();
-    if (this.toolbox) {
-      this.toolbox.refreshTheme();
+    if (this.toolbox_) {
+      this.toolbox_.refreshTheme();
     }
 
     // Re-render if workspace is visible
@@ -562,7 +561,7 @@ export class WorkspaceSvg
       this.setVisible(true);
     }
 
-    const event = new (eventUtils.get(EventType.THEME_CHANGE))(
+    const event = new (eventUtils.get(eventUtils.THEME_CHANGE))(
       this.getTheme().name,
       this.id,
     );
@@ -574,7 +573,7 @@ export class WorkspaceSvg
    *
    * @param blocks List of blocks to update the style on.
    */
-  private updateBlockStyles(blocks: Block[]) {
+  private updateBlockStyles_(blocks: Block[]) {
     for (let i = 0, block; (block = blocks[i]); i++) {
       const blockStyleName = block.getStyleName();
       if (blockStyleName) {
@@ -615,7 +614,7 @@ export class WorkspaceSvg
    *     False if the workspace has been hidden by calling `setVisible(false)`.
    */
   isVisible(): boolean {
-    return this.visible;
+    return this.isVisible_;
   }
 
   /**
@@ -638,24 +637,20 @@ export class WorkspaceSvg
       // Before the SVG canvas, scale the coordinates.
       scale = this.scale;
     }
-    let ancestor: Element = element;
     do {
       // Loop through this block and every parent.
-      const xy = svgMath.getRelativeXY(ancestor);
-      if (
-        ancestor === this.getCanvas() ||
-        ancestor === this.getBubbleCanvas()
-      ) {
+      const xy = svgMath.getRelativeXY(element);
+      if (element === this.getCanvas() || element === this.getBubbleCanvas()) {
         // After the SVG canvas, don't scale the coordinates.
         scale = 1;
       }
       x += xy.x * scale;
       y += xy.y * scale;
-      ancestor = ancestor.parentNode as Element;
+      element = element.parentNode as SVGElement;
     } while (
-      ancestor &&
-      ancestor !== this.getParentSvg() &&
-      ancestor !== this.getInjectionDiv()
+      element &&
+      element !== this.getParentSvg() &&
+      element !== this.getInjectionDiv()
     );
     return new Coordinate(x, y);
   }
@@ -693,15 +688,15 @@ export class WorkspaceSvg
    * @returns The first parent div with 'injectionDiv' in the name.
    * @internal
    */
-  getInjectionDiv(): HTMLElement {
+  getInjectionDiv(): Element {
     // NB: it would be better to pass this in at createDom, but is more likely
     // to break existing uses of Blockly.
     if (!this.injectionDiv) {
       let element: Element = this.svgGroup_;
       while (element) {
         const classes = element.getAttribute('class') || '';
-        if ((' ' + classes + ' ').includes(' injectionDiv ')) {
-          this.injectionDiv = element as HTMLElement;
+        if ((' ' + classes + ' ').indexOf(' injectionDiv ') !== -1) {
+          this.injectionDiv = element;
           break;
         }
         element = element.parentNode as Element;
@@ -745,7 +740,7 @@ export class WorkspaceSvg
    *     'blocklyMutatorBackground'.
    * @returns The workspace's SVG group.
    */
-  createDom(opt_backgroundClass?: string, injectionDiv?: HTMLElement): Element {
+  createDom(opt_backgroundClass?: string, injectionDiv?: Element): Element {
     if (!this.injectionDiv) {
       this.injectionDiv = injectionDiv ?? null;
     }
@@ -758,17 +753,7 @@ export class WorkspaceSvg
      *   <g class="blocklyBubbleCanvas"></g>
      * </g>
      */
-    this.svgGroup_ = dom.createSvgElement(Svg.G, {
-      'class': 'blocklyWorkspace',
-      'id': this.id,
-    });
-    if (injectionDiv) {
-      aria.setState(
-        this.svgGroup_,
-        aria.State.LABEL,
-        Msg['WORKSPACE_ARIA_LABEL'],
-      );
-    }
+    this.svgGroup_ = dom.createSvgElement(Svg.G, {'class': 'blocklyWorkspace'});
 
     // Note that a <g> alone does not receive mouse events--it must have a
     // valid target inside it.  If no background class is specified, as in the
@@ -781,7 +766,8 @@ export class WorkspaceSvg
       );
 
       if (opt_backgroundClass === 'blocklyMainBackground' && this.grid) {
-        this.svgBackground_.style.fill = 'var(--blocklyGridPattern)';
+        this.svgBackground_.style.fill =
+          'url(#' + this.grid.getPatternId() + ')';
       } else {
         this.themeManager_.subscribe(
           this.svgBackground_,
@@ -801,7 +787,7 @@ export class WorkspaceSvg
         this.svgGroup_,
         'pointerdown',
         this,
-        this.onMouseDown,
+        this.onMouseDown_,
         false,
       );
       // This no-op works around https://bugs.webkit.org/show_bug.cgi?id=226683,
@@ -813,7 +799,7 @@ export class WorkspaceSvg
         this.svgGroup_,
         'wheel',
         this,
-        this.onMouseWheel,
+        this.onMouseWheel_,
       );
     }
 
@@ -825,7 +811,7 @@ export class WorkspaceSvg
         this.options,
         true,
       );
-      this.toolbox = new ToolboxClass!(this);
+      this.toolbox_ = new ToolboxClass!(this);
     }
     if (this.grid) {
       this.grid.update(this.scale);
@@ -836,18 +822,9 @@ export class WorkspaceSvg
       this.options,
     );
 
-    if (CursorClass) this.markerManager.setCursor(new CursorClass(this));
+    CursorClass && this.markerManager.setCursor(new CursorClass());
 
-    const isParentWorkspace = this.options.parentWorkspace === null;
-    this.renderer.createDom(
-      this.svgGroup_,
-      this.getTheme(),
-      isParentWorkspace ? this.getInjectionDiv() : undefined,
-    );
-
-    // Only the top-level and flyout workspaces should be tabbable.
-    getFocusManager().registerTree(this, !!this.injectionDiv || this.isFlyout);
-
+    this.renderer.createDom(this.svgGroup_, this.getTheme());
     return this.svgGroup_;
   }
 
@@ -864,9 +841,9 @@ export class WorkspaceSvg
     if (this.svgGroup_) {
       dom.removeNode(this.svgGroup_);
     }
-    if (this.toolbox) {
-      this.toolbox.dispose();
-      this.toolbox = null;
+    if (this.toolbox_) {
+      this.toolbox_.dispose();
+      this.toolbox_ = null;
     }
     if (this.flyout) {
       this.flyout.dispose();
@@ -893,7 +870,10 @@ export class WorkspaceSvg
     }
 
     this.renderer.dispose();
-    this.markerManager.dispose();
+
+    if (this.markerManager) {
+      this.markerManager.dispose();
+    }
 
     super.dispose();
 
@@ -928,10 +908,6 @@ export class WorkspaceSvg
     if (this.dummyWheelListener) {
       document.body.removeEventListener('wheel', this.dummyWheelListener);
       this.dummyWheelListener = null;
-    }
-
-    if (getFocusManager().isRegistered(this)) {
-      getFocusManager().unregisterTree(this);
     }
   }
 
@@ -969,28 +945,6 @@ export class WorkspaceSvg
   }
 
   /**
-   * Creates a new set of options from this workspace's options with just the
-   * values that are relevant to a flyout.
-   *
-   * @returns A subset of this workspace's options.
-   */
-  copyOptionsForFlyout(): Options {
-    return new Options({
-      'parentWorkspace': this,
-      'rtl': this.RTL,
-      'oneBasedIndex': this.options.oneBasedIndex,
-      'horizontalLayout': this.horizontalLayout,
-      'renderer': this.options.renderer,
-      'rendererOverrides': this.options.rendererOverrides,
-      'plugins': this.options.plugins,
-      'modalInputs': this.options.modalInputs,
-      'move': {
-        'scrollbars': true,
-      },
-    } as BlocklyOptions);
-  }
-
-  /**
    * Add a flyout element in an element with the given tag name.
    *
    * @param tagName What type of tag the flyout belongs in.
@@ -998,7 +952,17 @@ export class WorkspaceSvg
    * @internal
    */
   addFlyout(tagName: string | Svg<SVGSVGElement> | Svg<SVGGElement>): Element {
-    const workspaceOptions = this.copyOptionsForFlyout();
+    const workspaceOptions = new Options({
+      'parentWorkspace': this,
+      'rtl': this.RTL,
+      'oneBasedIndex': this.options.oneBasedIndex,
+      'horizontalLayout': this.horizontalLayout,
+      'renderer': this.options.renderer,
+      'rendererOverrides': this.options.rendererOverrides,
+      'move': {
+        'scrollbars': true,
+      },
+    } as BlocklyOptions);
     workspaceOptions.toolboxPosition = this.options.toolboxPosition;
     if (this.horizontalLayout) {
       const HorizontalFlyout = registry.getClassFromOptions(
@@ -1036,8 +1000,8 @@ export class WorkspaceSvg
     if (this.flyout || opt_own) {
       return this.flyout;
     }
-    if (this.toolbox) {
-      return this.toolbox.getFlyout();
+    if (this.toolbox_) {
+      return this.toolbox_.getFlyout();
     }
     return null;
   }
@@ -1048,14 +1012,14 @@ export class WorkspaceSvg
    * @returns The toolbox on this workspace.
    */
   getToolbox(): IToolbox | null {
-    return this.toolbox;
+    return this.toolbox_;
   }
 
   /**
    * Update items that use screen coordinate calculations
    * because something has changed (e.g. scroll position, window size).
    */
-  private updateScreenCalculations() {
+  private updateScreenCalculations_() {
     this.updateInverseScreenCTM();
     this.recordDragTargets();
   }
@@ -1085,9 +1049,10 @@ export class WorkspaceSvg
    * trash, zoom, toolbox, etc. (e.g. window resize).
    */
   resize() {
-    if (this.toolbox) {
-      this.toolbox.position();
-    } else if (this.flyout) {
+    if (this.toolbox_) {
+      this.toolbox_.position();
+    }
+    if (this.flyout) {
       this.flyout.position();
     }
 
@@ -1108,7 +1073,7 @@ export class WorkspaceSvg
     if (this.scrollbar) {
       this.scrollbar.resize();
     }
-    this.updateScreenCalculations();
+    this.updateScreenCalculations_();
   }
 
   /**
@@ -1118,15 +1083,18 @@ export class WorkspaceSvg
    * @internal
    */
   updateScreenCalculationsIfScrolled() {
+    /* eslint-disable indent */
     const currScroll = svgMath.getDocumentScroll();
     if (!Coordinate.equals(this.lastRecordedPageScroll, currScroll)) {
       this.lastRecordedPageScroll = currScroll;
-      this.updateScreenCalculations();
+      this.updateScreenCalculations_();
     }
   }
+  /* eslint-enable indent */
 
   /**
    * @returns The layer manager for this workspace.
+   *
    * @internal
    */
   getLayerManager(): LayerManager | null {
@@ -1218,7 +1186,7 @@ export class WorkspaceSvg
       // of negligible changes in viewport top/left.
       return;
     }
-    const event = new (eventUtils.get(EventType.VIEWPORT_CHANGE))(
+    const event = new (eventUtils.get(eventUtils.VIEWPORT_CHANGE))(
       top,
       left,
       scale,
@@ -1263,7 +1231,7 @@ export class WorkspaceSvg
    * @param isVisible True if workspace should be visible.
    */
   setVisible(isVisible: boolean) {
-    this.visible = isVisible;
+    this.isVisible_ = isVisible;
     if (!this.svgGroup_) {
       return;
     }
@@ -1281,9 +1249,9 @@ export class WorkspaceSvg
     }
 
     this.getParentSvg().style.display = isVisible ? 'block' : 'none';
-    if (this.toolbox) {
+    if (this.toolbox_) {
       // Currently does not support toolboxes in mutators.
-      this.toolbox.setVisible(isVisible);
+      this.toolbox_.setVisible(isVisible);
     }
     if (!isVisible) {
       this.hideChaff(true);
@@ -1301,10 +1269,16 @@ export class WorkspaceSvg
       blocks[i].queueRender();
     }
 
-    this.getTopBlocks()
-      .flatMap((block) => block.getDescendants(false))
-      .filter((block) => block.isInsertionMarker())
-      .forEach((block) => block.queueRender());
+    if (this.currentGesture_) {
+      const imList = this.currentGesture_.getInsertionMarkers();
+      for (let i = 0; i < imList.length; i++) {
+        imList[i].queueRender();
+      }
+    }
+
+    renderManagement
+      .finishQueuedRenders()
+      .then(() => void this.markerManager.updateMarkers());
   }
 
   /**
@@ -1332,7 +1306,7 @@ export class WorkspaceSvg
       // Using Set here would be great, but at the cost of IE10 support.
       if (!state) {
         arrayUtils.removeElem(this.highlightedBlocks, block);
-      } else if (!this.highlightedBlocks.includes(block)) {
+      } else if (this.highlightedBlocks.indexOf(block) === -1) {
         this.highlightedBlocks.push(block);
       }
       block.setHighlighted(state);
@@ -1340,20 +1314,180 @@ export class WorkspaceSvg
   }
 
   /**
-   * Handles any necessary updates when a variable changes.
+   * Pastes the provided block or workspace comment onto the workspace.
+   * Does not check whether there is remaining capacity for the object, that
+   * should be done before calling this method.
    *
-   * @internal
+   * @param state The representation of the thing to paste.
+   * @returns The pasted thing, or null if the paste was not successful.
+   * @deprecated v10. Use `Blockly.clipboard.paste` instead. To be removed in
+   *     v11.
    */
-  private variableChangeCallback(event: AbstractEvent) {
-    switch (event.type) {
-      case EventType.VAR_CREATE:
-      case EventType.VAR_DELETE:
-      case EventType.VAR_RENAME:
-      case EventType.VAR_TYPE_CHANGE:
-        this.refreshToolboxSelection();
-        break;
-      default:
+  paste(
+    state: AnyDuringMigration | Element | DocumentFragment,
+  ): ICopyable<ICopyData> | null {
+    deprecation.warn(
+      'Blockly.WorkspaceSvg.prototype.paste',
+      'v10',
+      'v11',
+      'Blockly.clipboard.paste',
+    );
+    if (!this.rendered || (!state['type'] && !state['tagName'])) {
+      return null;
     }
+    if (this.currentGesture_) {
+      // Dragging while pasting?  No.
+      this.currentGesture_.cancel();
+    }
+
+    const existingGroup = eventUtils.getGroup();
+    if (!existingGroup) {
+      eventUtils.setGroup(true);
+    }
+    let pastedThing;
+    try {
+      // Checks if this is JSON. JSON has a type property, while elements don't.
+      if (state['type']) {
+        pastedThing = this.pasteBlock_(null, state as blocks.State);
+      } else {
+        const xmlBlock = state as Element;
+        if (xmlBlock.tagName.toLowerCase() === 'comment') {
+          pastedThing = this.pasteWorkspaceComment_(xmlBlock);
+        } else {
+          pastedThing = this.pasteBlock_(xmlBlock, null);
+        }
+      }
+    } finally {
+      eventUtils.setGroup(existingGroup);
+    }
+    return pastedThing;
+  }
+
+  /**
+   * Paste the provided block onto the workspace.
+   *
+   * @param xmlBlock XML block element.
+   * @param jsonBlock JSON block representation.
+   * @returns The pasted block.
+   */
+  private pasteBlock_(
+    xmlBlock: Element | null,
+    jsonBlock: blocks.State | null,
+  ): BlockSvg {
+    eventUtils.disable();
+    let block: BlockSvg;
+    try {
+      let blockX = 0;
+      let blockY = 0;
+      if (xmlBlock) {
+        block = Xml.domToBlockInternal(xmlBlock, this) as BlockSvg;
+        blockX = parseInt(xmlBlock.getAttribute('x') ?? '0');
+        if (this.RTL) {
+          blockX = -blockX;
+        }
+        blockY = parseInt(xmlBlock.getAttribute('y') ?? '0');
+      } else if (jsonBlock) {
+        block = blocks.append(jsonBlock, this) as BlockSvg;
+        blockX = jsonBlock['x'] || 10;
+        if (this.RTL) {
+          blockX = this.getWidth() - blockX;
+        }
+        blockY = jsonBlock['y'] || 10;
+      }
+
+      // Move the duplicate to original position.
+      if (!isNaN(blockX) && !isNaN(blockY)) {
+        // Offset block until not clobbering another block and not in connection
+        // distance with neighbouring blocks.
+        let collide;
+        do {
+          collide = false;
+          const allBlocks = this.getAllBlocks(false);
+          for (let i = 0, otherBlock; (otherBlock = allBlocks[i]); i++) {
+            const otherXY = otherBlock.getRelativeToSurfaceXY();
+            if (
+              Math.abs(blockX - otherXY.x) <= 1 &&
+              Math.abs(blockY - otherXY.y) <= 1
+            ) {
+              collide = true;
+              break;
+            }
+          }
+          if (!collide) {
+            // Check for blocks in snap range to any of its connections.
+            const connections = block!.getConnections_(false);
+            for (let i = 0, connection; (connection = connections[i]); i++) {
+              const neighbour = connection.closest(
+                config.snapRadius,
+                // This code doesn't work because it's passing absolute coords
+                // instead of relative coords. But we're deprecating the `paste`
+                // function anyway so we're not going to fix it.
+                new Coordinate(blockX, blockY),
+              );
+              if (neighbour.connection) {
+                collide = true;
+                break;
+              }
+            }
+          }
+          if (collide) {
+            if (this.RTL) {
+              blockX -= config.snapRadius;
+            } else {
+              blockX += config.snapRadius;
+            }
+            blockY += config.snapRadius * 2;
+          }
+        } while (collide);
+        // No 'reason' provided since events are disabled.
+        block!.moveTo(new Coordinate(blockX, blockY));
+      }
+    } finally {
+      eventUtils.enable();
+    }
+    if (eventUtils.isEnabled() && !block!.isShadow()) {
+      eventUtils.fire(new (eventUtils.get(eventUtils.BLOCK_CREATE))(block!));
+    }
+    block!.select();
+    return block!;
+  }
+
+  /**
+   * Paste the provided comment onto the workspace.
+   *
+   * @param xmlComment XML workspace comment element.
+   * @returns The pasted workspace comment.
+   */
+  private pasteWorkspaceComment_(xmlComment: Element): WorkspaceCommentSvg {
+    eventUtils.disable();
+    let comment: WorkspaceCommentSvg;
+    try {
+      comment = WorkspaceCommentSvg.fromXmlRendered(xmlComment, this);
+      // Move the duplicate to original position.
+      let commentX = parseInt(xmlComment.getAttribute('x') ?? '0');
+      let commentY = parseInt(xmlComment.getAttribute('y') ?? '0');
+      if (!isNaN(commentX) && !isNaN(commentY)) {
+        if (this.RTL) {
+          commentX = -commentX;
+        }
+        // Offset workspace comment.
+        // TODO (#1719): Properly offset comment such that it's not interfering
+        // with any blocks.
+        commentX += 50;
+        commentY += 50;
+        // This code doesn't work because it's passing absolute coords
+        // instead of relative coords. But we're deprecating the `paste`
+        // function anyway so we're not going to fix it.
+        comment.moveBy(commentX, commentY);
+      }
+    } finally {
+      eventUtils.enable();
+    }
+    if (eventUtils.isEnabled()) {
+      WorkspaceComment.fireCreateEvent(comment);
+    }
+    comment.select();
+    return comment;
   }
 
   /**
@@ -1363,9 +1497,53 @@ export class WorkspaceSvg
    */
   refreshToolboxSelection() {
     const ws = this.isFlyout ? this.targetWorkspace : this;
-    if (ws && !ws.currentGesture_ && ws.toolbox && ws.toolbox.getFlyout()) {
-      ws.toolbox.refreshSelection();
+    if (ws && !ws.currentGesture_ && ws.toolbox_ && ws.toolbox_.getFlyout()) {
+      ws.toolbox_.refreshSelection();
     }
+  }
+
+  /**
+   * Rename a variable by updating its name in the variable map.  Update the
+   *     flyout to show the renamed variable immediately.
+   *
+   * @param id ID of the variable to rename.
+   * @param newName New variable name.
+   */
+  override renameVariableById(id: string, newName: string) {
+    super.renameVariableById(id, newName);
+    this.refreshToolboxSelection();
+  }
+
+  /**
+   * Delete a variable by the passed in ID.   Update the flyout to show
+   *     immediately that the variable is deleted.
+   *
+   * @param id ID of variable to delete.
+   */
+  override deleteVariableById(id: string) {
+    super.deleteVariableById(id);
+    this.refreshToolboxSelection();
+  }
+
+  /**
+   * Create a new variable with the given name.  Update the flyout to show the
+   *     new variable immediately.
+   *
+   * @param name The new variable's name.
+   * @param opt_type The type of the variable like 'int' or 'string'.
+   *     Does not need to be unique. Field_variable can filter variables based
+   * on their type. This will default to '' which is a specific type.
+   * @param opt_id The unique ID of the variable. This will default to a UUID.
+   * @returns The newly created variable.
+   */
+  override createVariable(
+    name: string,
+    opt_type?: string | null,
+    opt_id?: string | null,
+  ): VariableModel {
+    const newVar = super.createVariable(name, opt_type, opt_id);
+    this.refreshToolboxSelection();
+    return newVar;
   }
 
   /** Make a list of all the delete areas for this workspace. */
@@ -1403,20 +1581,6 @@ export class WorkspaceSvg
         'monkey-patched in by blockly.ts',
     );
   }
-
-  /**
-   * Obtain a newly created comment.
-   *
-   * @param id Optional ID.  Use this ID if provided, otherwise create a new
-   *     ID.
-   * @returns The created comment.
-   */
-  newComment(id?: string): WorkspaceComment {
-    throw new Error(
-      'The implementation of newComment should be ' +
-        'monkey-patched in by blockly.ts',
-    );
-  }
   /* eslint-enable */
 
   /**
@@ -1440,7 +1604,7 @@ export class WorkspaceSvg
    *
    * @param e Pointer down event.
    */
-  private onMouseDown(e: PointerEvent) {
+  private onMouseDown_(e: PointerEvent) {
     const gesture = this.getGesture(e);
     if (gesture) {
       gesture.handleWsStart(e, this);
@@ -1454,7 +1618,16 @@ export class WorkspaceSvg
    * @param xy Starting location of object.
    */
   startDrag(e: PointerEvent, xy: Coordinate) {
-    drag.start(this, e, xy);
+    // Record the starting offset between the bubble's location and the mouse.
+    const point = browserEvents.mouseToSvg(
+      e,
+      this.getParentSvg(),
+      this.getInverseScreenCTM(),
+    );
+    // Fix scale of mouse event.
+    point.x /= this.scale;
+    point.y /= this.scale;
+    this.dragDeltaXY = Coordinate.difference(xy, point);
   }
 
   /**
@@ -1464,51 +1637,24 @@ export class WorkspaceSvg
    * @returns New location of object.
    */
   moveDrag(e: PointerEvent): Coordinate {
-    return drag.move(this, e);
+    const point = browserEvents.mouseToSvg(
+      e,
+      this.getParentSvg(),
+      this.getInverseScreenCTM(),
+    );
+    // Fix scale of mouse event.
+    point.x /= this.scale;
+    point.y /= this.scale;
+    return Coordinate.sum(this.dragDeltaXY!, point);
   }
 
   /**
-   * Indicate whether a keyboard move is in progress or not.
+   * Is the user currently dragging a block or scrolling the flyout/workspace?
    *
-   * Should be called with true when a keyboard move of an IDraggable
-   * is starts, and false when it finishes or is aborted.
-   *
-   * N.B.: This method is experimental and internal-only.  It is
-   * intended only to called only from the keyboard navigation plugin.
-   * Its signature and behaviour may be modified, or the method
-   * removed, at an time without notice and without being treated
-   * as a breaking change.
-   *
-   * TODO(#8960): Delete this.
-   *
-   * @internal
-   * @param inProgress Is a keyboard-initated move in progress?
-   */
-  setKeyboardMoveInProgress(inProgress: boolean) {
-    this.keyboardMoveInProgress = inProgress;
-  }
-
-  /**
-   * Returns true iff the user is currently engaged in a drag gesture,
-   * or if a keyboard-initated move is in progress.
-   *
-   * Dragging gestures normally entail moving a block or other item on
-   * the workspace, or scrolling the flyout/workspace.
-   *
-   * Keyboard-initated movements are implemnted using the dragging
-   * infrastructure and are intended to emulate (a subset of) drag
-   * gestures and so should typically be treated as if they were a
-   * gesture-based drag.
-   *
-   * @returns True iff a drag gesture or keyboard move is in porgress.
+   * @returns True if currently dragging or scrolling.
    */
   isDragging(): boolean {
-    return (
-      // TODO(#8960): Query Mover.isMoving to see if move is in
-      // progress rather than relying on a status flag.
-      this.keyboardMoveInProgress ||
-      (this.currentGesture_ !== null && this.currentGesture_.isDragging())
-    );
+    return this.currentGesture_ !== null && this.currentGesture_.isDragging();
   }
 
   /**
@@ -1574,7 +1720,7 @@ export class WorkspaceSvg
    *
    * @param e Mouse wheel event.
    */
-  private onMouseWheel(e: WheelEvent) {
+  private onMouseWheel_(e: WheelEvent) {
     // Don't scroll or zoom anything if drag is in progress.
     if (Gesture.inProgress()) {
       e.preventDefault();
@@ -1670,56 +1816,23 @@ export class WorkspaceSvg
     return boundary;
   }
 
-  /** Clean up the workspace by ordering all the blocks in a column such that none overlap. */
+  /** Clean up the workspace by ordering all the blocks in a column. */
   cleanUp() {
     this.setResizesEnabled(false);
     eventUtils.setGroup(true);
-
     const topBlocks = this.getTopBlocks(true);
-    const movableBlocks = topBlocks.filter((block) => block.isMovable());
-    const immovableBlocks = topBlocks.filter((block) => !block.isMovable());
-
-    const immovableBlockBounds = immovableBlocks.map((block) =>
-      block.getBoundingRectangle(),
-    );
-
-    const getNextIntersectingImmovableBlock = function (
-      rect: Rect,
-    ): Rect | null {
-      for (const immovableRect of immovableBlockBounds) {
-        if (rect.intersects(immovableRect)) {
-          return immovableRect;
-        }
-      }
-      return null;
-    };
-
     let cursorY = 0;
-    const minBlockHeight = this.renderer.getConstants().MIN_BLOCK_HEIGHT;
-    for (const block of movableBlocks) {
-      // Make the initial movement of shifting the block to its best possible position.
-      let boundingRect = block.getBoundingRectangle();
-      block.moveBy(-boundingRect.left, cursorY - boundingRect.top, ['cleanup']);
-      block.snapToGrid();
-
-      boundingRect = block.getBoundingRectangle();
-      let conflictingRect = getNextIntersectingImmovableBlock(boundingRect);
-      while (conflictingRect != null) {
-        // If the block intersects with an immovable block, move it down past that immovable block.
-        cursorY =
-          conflictingRect.top + conflictingRect.getHeight() + minBlockHeight;
-        block.moveBy(0, cursorY - boundingRect.top, ['cleanup']);
-        block.snapToGrid();
-        boundingRect = block.getBoundingRectangle();
-        conflictingRect = getNextIntersectingImmovableBlock(boundingRect);
+    for (let i = 0, block; (block = topBlocks[i]); i++) {
+      if (!block.isMovable()) {
+        continue;
       }
-
-      // Ensure all next blocks start past the most recent (which will also put them past all
-      // previously intersecting immovable blocks).
+      const xy = block.getRelativeToSurfaceXY();
+      block.moveBy(-xy.x, cursorY - xy.y, ['cleanup']);
+      block.snapToGrid();
       cursorY =
         block.getRelativeToSurfaceXY().y +
         block.getHeightWidth().height +
-        minBlockHeight;
+        this.renderer.getConstants().MIN_BLOCK_HEIGHT;
     }
     eventUtils.setGroup(false);
     this.setResizesEnabled(true);
@@ -1732,12 +1845,12 @@ export class WorkspaceSvg
    * @internal
    */
   showContextMenu(e: Event) {
-    if (this.isReadOnly() || this.isFlyout) {
+    if (this.options.readOnly || this.isFlyout) {
       return;
     }
     const menuOptions = ContextMenuRegistry.registry.getContextMenuOptions(
-      {workspace: this, focusedNode: this},
-      e,
+      ContextMenuRegistry.ScopeType.WORKSPACE,
+      {workspace: this},
     );
 
     // Allow the developer to add or modify menuOptions.
@@ -1745,15 +1858,7 @@ export class WorkspaceSvg
       this.configureContextMenu(menuOptions, e);
     }
 
-    let location;
-    if (e instanceof PointerEvent) {
-      location = new Coordinate(e.clientX, e.clientY);
-    } else {
-      // TODO: Get the location based on the workspace cursor location
-      location = svgMath.wsToScreenCoordinates(this, new Coordinate(5, 5));
-    }
-
-    ContextMenu.show(e, menuOptions, this.RTL, this, location);
+    ContextMenu.show(e, menuOptions, this.RTL);
   }
 
   /**
@@ -1776,11 +1881,11 @@ export class WorkspaceSvg
     }
 
     if (toolbox.hasCategories(parsedToolboxDef)) {
-      if (!this.toolbox) {
+      if (!this.toolbox_) {
         throw Error("Existing toolbox has no categories.  Can't change mode.");
       }
       this.options.languageTree = parsedToolboxDef;
-      this.toolbox.render(parsedToolboxDef);
+      this.toolbox_.render(parsedToolboxDef);
     } else {
       if (!this.flyout) {
         throw Error("Existing toolbox has categories.  Can't change mode.");
@@ -2087,67 +2192,16 @@ export class WorkspaceSvg
   }
 
   /**
-   * Get the workspace's zoom factor.
+   * Get the workspace's zoom factor.  If the workspace has a parent, we call
+   * into the parent to get the workspace scale.
    *
    * @returns The workspace zoom factor. Units: (pixels / workspaceUnit).
    */
   getScale(): number {
+    if (this.options.parentWorkspace) {
+      return this.options.parentWorkspace.getScale();
+    }
     return this.scale;
-  }
-
-  /**
-   * Returns the absolute scale of the workspace.
-   *
-   * Workspace scaling is multiplicative; if a workspace B (e.g. a mutator editor)
-   * with scale Y is nested within a root workspace A with scale X, workspace B's
-   * effective scale is X * Y, because, as a child of A, it is already transformed
-   * by A's scaling factor, and then further transforms itself by its own scaling
-   * factor. Normally this Just Works, but for global elements (e.g. field
-   * editors) that are visually associated with a particular workspace but live at
-   * the top level of the DOM rather than being a child of their associated
-   * workspace, the absolute/effective scale may be needed to render
-   * appropriately.
-   *
-   * @returns The absolute/effective scale of the given workspace.
-   */
-  getAbsoluteScale() {
-    // Returns a workspace's own scale, without regard to multiplicative scaling.
-    const getLocalScale = (workspace: WorkspaceSvg): number => {
-      // Workspaces in flyouts may have a distinct scale; use this if relevant.
-      if (workspace.isFlyout) {
-        const flyout = workspace.targetWorkspace?.getFlyout();
-        if (flyout instanceof Flyout) {
-          return flyout.getFlyoutScale();
-        }
-      }
-
-      return workspace.getScale();
-    };
-
-    const computeScale = (workspace: WorkspaceSvg, scale: number): number => {
-      // If the workspace has no parent, or it does have a parent but is not
-      // actually a child of its parent workspace in the DOM (this is the case for
-      // flyouts in the main workspace), we're done; just return the scale so far
-      // multiplied by the workspace's own scale.
-      if (
-        !workspace.options.parentWorkspace ||
-        !workspace.options.parentWorkspace
-          .getSvgGroup()
-          .contains(workspace.getSvgGroup())
-      ) {
-        return scale * getLocalScale(workspace);
-      }
-
-      // If there is a parent workspace, and this workspace is a child of it in
-      // the DOM, scales are multiplicative, so recurse up the workspace
-      // hierarchy.
-      return computeScale(
-        workspace.options.parentWorkspace,
-        scale * getLocalScale(workspace),
-      );
-    };
-
-    return computeScale(this, 1);
   }
 
   /**
@@ -2157,6 +2211,7 @@ export class WorkspaceSvg
    *
    * @param x Target X to scroll to.
    * @param y Target Y to scroll to.
+   * @internal
    */
   scroll(x: number, y: number) {
     this.hideChaff(/* opt_onlyClosePopups= */ true);
@@ -2259,8 +2314,8 @@ export class WorkspaceSvg
    *
    * @param comment comment to add.
    */
-  override addTopComment(comment: RenderedWorkspaceComment) {
-    this.addTopBoundedElement(comment);
+  override addTopComment(comment: WorkspaceComment) {
+    this.addTopBoundedElement(comment as WorkspaceCommentSvg);
     super.addTopComment(comment);
   }
 
@@ -2269,29 +2324,9 @@ export class WorkspaceSvg
    *
    * @param comment comment to remove.
    */
-  override removeTopComment(comment: RenderedWorkspaceComment) {
-    this.removeTopBoundedElement(comment);
+  override removeTopComment(comment: WorkspaceComment) {
+    this.removeTopBoundedElement(comment as WorkspaceCommentSvg);
     super.removeTopComment(comment);
-  }
-
-  /**
-   * Returns a list of comments on this workspace.
-   *
-   * @param ordered If true, sorts the comments based on their position.
-   * @returns A list of workspace comments.
-   */
-  override getTopComments(ordered = false): RenderedWorkspaceComment[] {
-    return super.getTopComments(ordered) as RenderedWorkspaceComment[];
-  }
-
-  /**
-   * Returns the workspace comment with the given ID, if any.
-   *
-   * @param id The ID of the comment to retrieve.
-   * @returns The workspace comment with the given ID, or null.
-   */
-  override getCommentById(id: string): RenderedWorkspaceComment | null {
-    return super.getCommentById(id) as RenderedWorkspaceComment | null;
   }
 
   override getRootWorkspace(): WorkspaceSvg | null {
@@ -2321,15 +2356,8 @@ export class WorkspaceSvg
    *
    * @returns The top-level bounded elements.
    */
-  getTopBoundedElements(ordered = false): IBoundedElement[] {
-    const elements = new Array<IBoundedElement>().concat(
-      this.topBoundedElements,
-    );
-    if (ordered) {
-      elements.sort(this.sortByOrigin.bind(this));
-    }
-
-    return elements;
+  getTopBoundedElements(): IBoundedElement[] {
+    return new Array<IBoundedElement>().concat(this.topBoundedElements);
   }
 
   /**
@@ -2442,17 +2470,7 @@ export class WorkspaceSvg
 
   /**
    * Look up the gesture that is tracking this touch stream on this workspace.
-   *
-   * Returns the gesture in progress, except:
-   *
-   * - If there is a keyboard-initiate move in progress then null will
-   *   be returned - after calling event.preventDefault() and
-   *   event.stopPropagation() to ensure the pointer event is ignored.
-   * - If there is a gesture in progress but event.type is
-   *   'pointerdown' then the in-progress gesture will be cancelled;
-   *   this will result in null being returned.
-   * - If no gesutre is in progress but event is a pointerdown then a
-   *   new gesture will be created and returned.
+   * May create a new gesture.
    *
    * @param e Pointer event.
    * @returns The gesture that is tracking this touch stream, or null if no
@@ -2460,29 +2478,28 @@ export class WorkspaceSvg
    * @internal
    */
   getGesture(e: PointerEvent): Gesture | null {
-    // TODO(#8960): Query Mover.isMoving to see if move is in progress
-    // rather than relying on .keyboardMoveInProgress status flag.
-    if (this.keyboardMoveInProgress) {
-      // Normally these would be called from Gesture.doStart.
-      e.preventDefault();
-      e.stopPropagation();
-      return null;
-    }
-
     const isStart = e.type === 'pointerdown';
-    if (isStart && this.currentGesture_?.hasStarted()) {
-      console.warn('Tried to start the same gesture twice.');
-      // That's funny.  We must have missed a mouse up.
-      // Cancel it, rather than try to retrieve all of the state we need.
-      this.currentGesture_.cancel(); // Sets this.currentGesture_ to null.
-    }
-    if (!this.currentGesture_ && isStart) {
-      // No gesture existed on this workspace, but this looks like the
-      // start of a new gesture.
-      this.currentGesture_ = new Gesture(e, this);
+
+    const gesture = this.currentGesture_;
+    if (gesture) {
+      if (isStart && gesture.hasStarted()) {
+        console.warn('Tried to start the same gesture twice.');
+        // That's funny.  We must have missed a mouse up.
+        // Cancel it, rather than try to retrieve all of the state we need.
+        gesture.cancel();
+        return null;
+      }
+      return gesture;
     }
 
-    return this.currentGesture_;
+    // No gesture existed on this workspace, but this looks like the start of a
+    // new gesture.
+    if (isStart) {
+      this.currentGesture_ = new Gesture(e, this);
+      return this.currentGesture_;
+    }
+    // No gesture existed and this event couldn't be the start of a new gesture.
+    return null;
   }
 
   /**
@@ -2531,7 +2548,7 @@ export class WorkspaceSvg
    */
   hideChaff(onlyClosePopups = false) {
     Tooltip.hide();
-    WidgetDiv.hideIfOwnerIsInWorkspace(this);
+    WidgetDiv.hide();
     dropDownDiv.hideWithoutAnimation();
 
     this.hideComponents(onlyClosePopups);
@@ -2560,7 +2577,7 @@ export class WorkspaceSvg
    * @param xyRatio Contains an x and/or y property which is a float between 0
    *     and 1 specifying the degree of scrolling.
    */
-  private static setTopLevelWorkspaceMetrics(
+  private static setTopLevelWorkspaceMetrics_(
     this: WorkspaceSvg,
     xyRatio: {x?: number; y?: number},
   ) {
@@ -2584,337 +2601,6 @@ export class WorkspaceSvg
     const y = this.scrollY + metrics.absoluteTop;
     // We could call scroll here, but that has extra checks we don't need to do.
     this.translate(x, y);
-  }
-
-  /**
-   * Adds a CSS class to the workspace.
-   *
-   * @param className Name of class to add.
-   */
-  addClass(className: string) {
-    if (this.injectionDiv) {
-      dom.addClass(this.injectionDiv, className);
-    }
-  }
-
-  /**
-   * Removes a CSS class from the workspace.
-   *
-   * @param className Name of class to remove.
-   */
-  removeClass(className: string) {
-    if (this.injectionDiv) {
-      dom.removeClass(this.injectionDiv, className);
-    }
-  }
-
-  override setIsReadOnly(readOnly: boolean) {
-    super.setIsReadOnly(readOnly);
-    if (readOnly) {
-      this.addClass('blocklyReadOnly');
-    } else {
-      this.removeClass('blocklyReadOnly');
-    }
-  }
-
-  /**
-   * Scrolls the provided bounds into view.
-   *
-   * In the case of small workspaces/large bounds, this function prioritizes
-   * getting the top left corner of the bounds into view. It also adds some
-   * padding around the bounds to allow the element to be comfortably in view.
-   *
-   * @internal
-   * @param bounds A rectangle to scroll into view, as best as possible.
-   * @param padding Amount of spacing to put between the bounds and the edge of
-   *     the workspace's viewport.
-   */
-  scrollBoundsIntoView(bounds: Rect, padding = 10) {
-    if (Gesture.inProgress()) {
-      // This can cause jumps during a drag and is only suited for keyboard nav.
-      return;
-    }
-    const scale = this.getScale();
-
-    const rawViewport = this.getMetricsManager().getViewMetrics(true);
-    const viewport = new Rect(
-      rawViewport.top,
-      rawViewport.top + rawViewport.height,
-      rawViewport.left,
-      rawViewport.left + rawViewport.width,
-    );
-
-    if (
-      bounds.left >= viewport.left &&
-      bounds.top >= viewport.top &&
-      bounds.right <= viewport.right &&
-      bounds.bottom <= viewport.bottom
-    ) {
-      // Do nothing if the block is fully inside the viewport.
-      return;
-    }
-
-    // Add some padding to the bounds so the element is scrolled comfortably
-    // into view.
-    bounds = bounds.clone();
-    bounds.top -= padding;
-    bounds.bottom += padding;
-    bounds.left -= padding;
-    bounds.right += padding;
-
-    let deltaX = 0;
-    let deltaY = 0;
-
-    if (bounds.left < viewport.left) {
-      deltaX = this.RTL
-        ? Math.min(
-            viewport.left - bounds.left,
-            viewport.right - bounds.right, // Don't move the right side out of view
-          )
-        : viewport.left - bounds.left;
-    } else if (bounds.right > viewport.right) {
-      deltaX = this.RTL
-        ? viewport.right - bounds.right
-        : Math.max(
-            viewport.right - bounds.right,
-            viewport.left - bounds.left, // Don't move the left side out of view
-          );
-    }
-
-    if (bounds.top < viewport.top) {
-      deltaY = viewport.top - bounds.top;
-    } else if (bounds.bottom > viewport.bottom) {
-      deltaY = Math.max(
-        viewport.bottom - bounds.bottom,
-        viewport.top - bounds.top, // Don't move the top out of view
-      );
-    }
-
-    deltaX *= scale;
-    deltaY *= scale;
-    this.scroll(this.scrollX + deltaX, this.scrollY + deltaY);
-  }
-
-  /** See IFocusableNode.getFocusableElement. */
-  getFocusableElement(): HTMLElement | SVGElement {
-    return this.svgGroup_;
-  }
-
-  /** See IFocusableNode.getFocusableTree. */
-  getFocusableTree(): IFocusableTree {
-    return (this.isMutator && this.options.parentWorkspace) || this;
-  }
-
-  /** See IFocusableNode.onNodeFocus. */
-  onNodeFocus(): void {}
-
-  /** See IFocusableNode.onNodeBlur. */
-  onNodeBlur(): void {}
-
-  /** See IFocusableNode.canBeFocused. */
-  canBeFocused(): boolean {
-    return true;
-  }
-
-  /** See IFocusableTree.getRootFocusableNode. */
-  getRootFocusableNode(): IFocusableNode {
-    return this;
-  }
-
-  /** See IFocusableTree.getRestoredFocusableNode. */
-  getRestoredFocusableNode(
-    previousNode: IFocusableNode | null,
-  ): IFocusableNode | null {
-    if (!previousNode) {
-      return this.getTopBlocks(true)[0] ?? null;
-    } else return null;
-  }
-
-  /** See IFocusableTree.getNestedTrees. */
-  getNestedTrees(): Array<IFocusableTree> {
-    const nestedWorkspaces = this.getAllBlocks()
-      .map((block) => block.getIcons())
-      .flat()
-      .filter(
-        (icon): icon is MutatorIcon =>
-          icon instanceof MutatorIcon && icon.bubbleIsVisible(),
-      )
-      .map((icon) => icon.getBubble()?.getWorkspace())
-      .filter((workspace) => !!workspace);
-
-    const ownFlyout = this.getFlyout(true);
-    if (ownFlyout) {
-      nestedWorkspaces.push(ownFlyout.getWorkspace());
-    }
-
-    return nestedWorkspaces;
-  }
-
-  /**
-   * Used for searching for a specific workspace comment.
-   * We can't use this.getWorkspaceCommentById because the workspace
-   * comment ids might not be globally unique, but the id assigned to
-   * the focusable element for the comment should be.
-   */
-  private searchForWorkspaceComment(
-    id: string,
-  ): RenderedWorkspaceComment | undefined {
-    for (const comment of this.getTopComments()) {
-      if (
-        comment instanceof RenderedWorkspaceComment &&
-        comment.canBeFocused() &&
-        comment.getFocusableElement().id === id
-      ) {
-        return comment;
-      }
-    }
-  }
-
-  /** See IFocusableTree.lookUpFocusableNode. */
-  lookUpFocusableNode(id: string): IFocusableNode | null {
-    // Check against flyout items if this workspace is part of a flyout. Note
-    // that blocks may match against this pass before reaching getBlockById()
-    // below (but only for a flyout workspace).
-    const flyout = this.targetWorkspace?.getFlyout();
-    if (this.isFlyout && flyout) {
-      for (const flyoutItem of flyout.getContents()) {
-        const elem = flyoutItem.getElement();
-        if (
-          isFocusableNode(elem) &&
-          elem.canBeFocused() &&
-          elem.getFocusableElement().id === id
-        ) {
-          return elem;
-        }
-      }
-    }
-
-    // Search for fields and connections (based on ID indicators).
-    const fieldIndicatorIndex = id.indexOf('_field_');
-    const connectionIndicatorIndex = id.indexOf('_connection_');
-    if (fieldIndicatorIndex !== -1) {
-      const blockId = id.substring(0, fieldIndicatorIndex);
-      const block = this.getBlockById(blockId);
-      if (block) {
-        for (const field of block.getFields()) {
-          if (field.canBeFocused() && field.getFocusableElement().id === id) {
-            return field;
-          }
-        }
-      }
-      return null;
-    } else if (connectionIndicatorIndex !== -1) {
-      const blockId = id.substring(0, connectionIndicatorIndex);
-      const block = this.getBlockById(blockId);
-      if (block) {
-        for (const connection of block.getConnections_(true)) {
-          if (connection.id === id) return connection;
-        }
-      }
-      return null;
-    }
-
-    // Search for a specific workspace comment or comment icon if the ID
-    // indicates the presence of one.
-    const commentIdSeparatorIndex = Math.max(
-      id.indexOf(COMMENT_EDITOR_FOCUS_IDENTIFIER),
-      id.indexOf(COMMENT_COLLAPSE_BAR_BUTTON_FOCUS_IDENTIFIER),
-      id.indexOf(COMMENT_DELETE_BAR_BUTTON_FOCUS_IDENTIFIER),
-    );
-    if (commentIdSeparatorIndex !== -1) {
-      const commentId = id.substring(0, commentIdSeparatorIndex);
-      const comment = this.searchForWorkspaceComment(commentId);
-      if (comment) {
-        if (id.indexOf(COMMENT_EDITOR_FOCUS_IDENTIFIER) > -1) {
-          return comment.getEditorFocusableNode();
-        } else {
-          return (
-            comment.view
-              .getCommentBarButtons()
-              .find((button) => button.getFocusableElement().id.includes(id)) ??
-            null
-          );
-        }
-      }
-    }
-
-    // Search for a specific block.
-    // Don't use `getBlockById` because the block ID is not guaranteed
-    // to be globally unique, but the ID on the focusable element is.
-    const block = this.getAllBlocks(false).find(
-      (block) => block.getFocusableElement().id === id,
-    );
-    if (block) return block;
-
-    // Search for a workspace comment (semi-expensive).
-    const comment = this.searchForWorkspaceComment(id);
-    if (comment) {
-      return comment;
-    }
-
-    // Search for icons and bubbles (which requires an expensive getAllBlocks).
-    const icons = this.getAllBlocks()
-      .map((block) => block.getIcons())
-      .flat();
-    for (const icon of icons) {
-      if (icon.canBeFocused() && icon.getFocusableElement().id === id) {
-        return icon;
-      }
-      if (hasBubble(icon)) {
-        const bubble = icon.getBubble();
-        if (
-          bubble &&
-          bubble.canBeFocused() &&
-          bubble.getFocusableElement().id === id
-        ) {
-          return bubble;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  /** See IFocusableTree.onTreeFocus. */
-  onTreeFocus(
-    _node: IFocusableNode,
-    _previousTree: IFocusableTree | null,
-  ): void {}
-
-  /** See IFocusableTree.onTreeBlur. */
-  onTreeBlur(nextTree: IFocusableTree | null): void {
-    // If the flyout loses focus, make sure to close it unless focus is being
-    // lost to the toolbox or ephemeral focus.
-    if (this.isFlyout && this.targetWorkspace) {
-      // Only hide the flyout if the flyout's workspace is losing focus and that
-      // focus isn't returning to the flyout itself, the toolbox, or ephemeral.
-      if (getFocusManager().ephemeralFocusTaken()) return;
-      const flyout = this.targetWorkspace.getFlyout();
-      const toolbox = this.targetWorkspace.getToolbox();
-      if (toolbox && nextTree === toolbox) return;
-      if (toolbox) toolbox.clearSelection();
-      if (flyout && isAutoHideable(flyout)) flyout.autoHide(false);
-    }
-  }
-
-  /**
-   * Returns an object responsible for coordinating movement of focus between
-   * items on this workspace in response to keyboard navigation commands.
-   *
-   * @returns This workspace's Navigator instance.
-   */
-  getNavigator(): Navigator {
-    return this.navigator;
-  }
-
-  /**
-   * Sets the Navigator instance used by this workspace.
-   *
-   * @param newNavigator A Navigator object to coordinate movement between
-   *     elements on the workspace.
-   */
-  setNavigator(newNavigator: Navigator) {
-    this.navigator = newNavigator;
   }
 }
 

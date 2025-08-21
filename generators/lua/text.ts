@@ -10,8 +10,8 @@
 
 // Former goog.module ID: Blockly.Lua.texts
 
-import type {JoinMutatorBlock} from '../../blocks/text.js';
 import type {Block} from '../../core/block.js';
+import type {JoinMutatorBlock} from '../../blocks/text.js';
 import type {LuaGenerator} from './lua_generator.js';
 import {Order} from './lua_generator.js';
 
@@ -19,6 +19,16 @@ export function text(block: Block, generator: LuaGenerator): [string, Order] {
   // Text value.
   const code = generator.quote_(block.getFieldValue('TEXT'));
   return [code, Order.ATOMIC];
+}
+
+export function text_multiline(
+  block: Block,
+  generator: LuaGenerator,
+): [string, Order] {
+  // Text value.
+  const code = generator.multiline_quote_(block.getFieldValue('TEXT'));
+  const order = code.indexOf('..') !== -1 ? Order.CONCATENATION : Order.ATOMIC;
+  return [code, order];
 }
 
 export function text_join(
@@ -122,6 +132,8 @@ export function text_charAt(
   // Get letter at index.
   // Note: Until January 2013 this block did not have the WHERE input.
   const where = block.getFieldValue('WHERE') || 'FROM_START';
+  const atOrder = where === 'FROM_END' ? Order.UNARY : Order.NONE;
+  const at = generator.valueToCode(block, 'AT', atOrder) || '1';
   const text = generator.valueToCode(block, 'VALUE', Order.NONE) || "''";
   let code;
   if (where === 'RANDOM') {
@@ -142,8 +154,6 @@ end
     } else if (where === 'LAST') {
       start = '-1';
     } else {
-      const atOrder = where === 'FROM_END' ? Order.UNARY : Order.NONE;
-      const at = generator.valueToCode(block, 'AT', atOrder) || '1';
       if (where === 'FROM_START') {
         start = at;
       } else if (where === 'FROM_END') {

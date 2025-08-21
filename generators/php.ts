@@ -12,11 +12,12 @@
 
 // Former goog.module ID: Blockly.PHP.all
 
+import {PhpGenerator} from './php/php_generator.js';
+import * as colour from './php/colour.js';
 import * as lists from './php/lists.js';
 import * as logic from './php/logic.js';
 import * as loops from './php/loops.js';
 import * as math from './php/math.js';
-import {PhpGenerator} from './php/php_generator.js';
 import * as procedures from './php/procedures.js';
 import * as text from './php/text.js';
 import * as variables from './php/variables.js';
@@ -32,6 +33,7 @@ export const phpGenerator = new PhpGenerator();
 
 // Install per-block-type generator functions:
 const generators: typeof phpGenerator.forBlock = {
+  ...colour,
   ...lists,
   ...logic,
   ...loops,

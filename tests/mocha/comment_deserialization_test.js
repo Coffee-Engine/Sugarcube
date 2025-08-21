@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../node_modules/chai/chai.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
@@ -61,23 +60,25 @@ suite('Comment Deserialization', function () {
       icon.setBubbleVisible(true);
       // Check comment bubble size.
       const bubbleSize = icon.getBubbleSize();
-      assert.isNotNaN(bubbleSize.width);
-      assert.isNotNaN(bubbleSize.height);
-      assert.equal(icon.getText(), text);
+      chai.assert.isNotNaN(bubbleSize.width);
+      chai.assert.isNotNaN(bubbleSize.height);
+      chai.assert.equal(icon.getText(), text);
     }
     test('Trashcan', function () {
       // Create block.
       this.block = createBlock(this.workspace);
       // Delete block.
       this.block.checkAndDelete();
-      assert.equal(this.workspace.getAllBlocks().length, 0);
+      chai.assert.equal(this.workspace.getAllBlocks().length, 0);
       // Open trashcan.
       simulateClick(this.workspace.trashcan.svgGroup);
       // Place from trashcan.
       simulateClick(
-        this.workspace.trashcan.flyout.svgGroup_.querySelector('.blocklyPath'),
+        this.workspace.trashcan.flyout.svgGroup_.querySelector(
+          '.blocklyDraggable',
+        ),
       );
-      assert.equal(this.workspace.getAllBlocks().length, 1);
+      chai.assert.equal(this.workspace.getAllBlocks().length, 1);
       // Check comment.
       assertComment(this.workspace, 'test text');
     });
@@ -86,10 +87,10 @@ suite('Comment Deserialization', function () {
       this.block = createBlock(this.workspace);
       // Delete block.
       this.block.checkAndDelete();
-      assert.equal(this.workspace.getAllBlocks().length, 0);
+      chai.assert.equal(this.workspace.getAllBlocks().length, 0);
       // Undo.
       this.workspace.undo(false);
-      assert.equal(this.workspace.getAllBlocks().length, 1);
+      chai.assert.equal(this.workspace.getAllBlocks().length, 1);
       // Check comment.
       assertComment(this.workspace, 'test text');
     });
@@ -99,22 +100,22 @@ suite('Comment Deserialization', function () {
       // Undo & undo.
       this.workspace.undo(false);
       this.workspace.undo(false);
-      assert.equal(this.workspace.getAllBlocks().length, 0);
+      chai.assert.equal(this.workspace.getAllBlocks().length, 0);
       // Redo & redo.
       this.workspace.undo(true);
       this.workspace.undo(true);
-      assert.equal(this.workspace.getAllBlocks().length, 1);
+      chai.assert.equal(this.workspace.getAllBlocks().length, 1);
       // Check comment.
       assertComment(this.workspace, 'test text');
     });
     test('Toolbox', function () {
       // Place from toolbox.
       const toolbox = this.workspace.getToolbox();
-      simulateClick(toolbox.HtmlDiv.querySelector('.blocklyToolboxCategory'));
+      simulateClick(toolbox.HtmlDiv.querySelector('.blocklyTreeRow'));
       simulateClick(
-        toolbox.getFlyout().svgGroup_.querySelector('.blocklyPath'),
+        toolbox.getFlyout().svgGroup_.querySelector('.blocklyDraggable'),
       );
-      assert.equal(this.workspace.getAllBlocks().length, 1);
+      chai.assert.equal(this.workspace.getAllBlocks().length, 1);
       // Check comment.
       assertComment(this.workspace, 'test toolbox text');
     });

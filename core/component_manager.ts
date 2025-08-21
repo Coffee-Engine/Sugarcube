@@ -23,10 +23,10 @@ class Capability<_T> {
   static DRAG_TARGET = new Capability<IDragTarget>('drag_target');
   static DELETE_AREA = new Capability<IDeleteArea>('delete_area');
   static AUTOHIDEABLE = new Capability<IAutoHideable>('autohideable');
-  private readonly name: string;
+  private readonly name_: string;
   /** @param name The name of the component capability. */
   constructor(name: string) {
-    this.name = name;
+    this.name_ = name;
   }
 
   /**
@@ -35,7 +35,7 @@ class Capability<_T> {
    * @returns The name.
    */
   toString(): string {
-    return this.name;
+    return this.name_;
   }
 }
 
@@ -172,7 +172,7 @@ export class ComponentManager {
     capability = `${capability}`.toLowerCase();
     return (
       this.componentData.has(id) &&
-      this.componentData.get(id)!.capabilities.includes(capability)
+      this.componentData.get(id)!.capabilities.indexOf(capability) !== -1
     );
   }
 
@@ -224,16 +224,6 @@ export class ComponentManager {
 }
 
 export namespace ComponentManager {
-  export enum ComponentWeight {
-    // The toolbox weight is lower (higher precedence) than the flyout, so that
-    // if both are under the pointer, the toolbox takes precedence even though
-    // the flyout's drag target area is large enough to include the toolbox.
-    TOOLBOX_WEIGHT = 0,
-    FLYOUT_WEIGHT = 1,
-    TRASHCAN_WEIGHT = 2,
-    ZOOM_CONTROLS_WEIGHT = 3,
-  }
-
   /** An object storing component information. */
   export interface ComponentDatum {
     component: IComponent;
@@ -242,6 +232,4 @@ export namespace ComponentManager {
   }
 }
 
-export type ComponentWeight = ComponentManager.ComponentWeight;
-export const ComponentWeight = ComponentManager.ComponentWeight;
 export type ComponentDatum = ComponentManager.ComponentDatum;

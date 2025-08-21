@@ -224,9 +224,9 @@ BlockExporterController.prototype.selectUsedBlocks = function() {
   var unstoredCustomBlockTypes = [];
 
   for (var i = 0, blockType; blockType = this.usedBlockTypes[i]; i++) {
-    if (storedBlockTypes.includes(blockType)) {
+    if (storedBlockTypes.indexOf(blockType) !== -1) {
       sharedBlockTypes.push(blockType);
-    } else if (!StandardCategories.coreBlockTypes.includes(blockType)) {
+    } else if (StandardCategories.coreBlockTypes.indexOf(blockType) === -1) {
       unstoredCustomBlockTypes.push(blockType);
     }
   }

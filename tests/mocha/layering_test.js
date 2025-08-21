@@ -3,7 +3,6 @@
  * Copyright 2023 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {assert} from '../../node_modules/chai/chai.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
@@ -24,15 +23,6 @@ suite('Layering', function () {
     const g = Blockly.utils.dom.createSvgElement('g', {});
     return {
       getSvgRoot: () => g,
-      getFocusableElement: () => {
-        throw new Error('Unsupported.');
-      },
-      getFocusableTree: () => {
-        throw new Error('Unsupported.');
-      },
-      onNodeFocus: () => {},
-      onNodeBlur: () => {},
-      canBeFocused: () => false,
     };
   }
 
@@ -45,7 +35,7 @@ suite('Layering', function () {
       const layerCount = this.layerManager.layers.size;
       this.layerManager.append(elem2, 999);
 
-      assert.equal(
+      chai.assert.equal(
         this.layerManager.layers.size,
         layerCount,
         'Expected the element to be appended to the existing layer',
@@ -64,7 +54,7 @@ suite('Layering', function () {
 
       const layer1000 = this.layerManager.layers.get(1000);
       const layer1010 = this.layerManager.layers.get(1010);
-      assert.equal(
+      chai.assert.equal(
         layer1000.nextSibling,
         layer1010,
         'Expected layer 1000 to be direclty before layer 1010',
@@ -80,7 +70,7 @@ suite('Layering', function () {
 
       const layer1010 = this.layerManager.layers.get(1010);
       const layer1000 = this.layerManager.layers.get(1000);
-      assert.equal(
+      chai.assert.equal(
         layer1000.nextSibling,
         layer1010,
         'Expected layer 1000 to be direclty before layer 1010',
@@ -94,7 +84,7 @@ suite('Layering', function () {
 
       this.layerManager.moveToDragLayer(elem);
 
-      assert.equal(
+      chai.assert.equal(
         this.layerManager.dragLayer.firstChild,
         elem.getSvgRoot(),
         'Expected the element to be the first element in the drag layer.',

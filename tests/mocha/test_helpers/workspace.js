@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as eventUtils from '../../../build/src/core/events/utils.js';
-import {assert} from '../../../node_modules/chai/chai.js';
-import {workspaceTeardown} from './setup_teardown.js';
 import {assertVariableValues} from './variables.js';
 import {assertWarnings} from './warnings.js';
+import * as eventUtils from '../../../build/src/core/events/utils.js';
+import {workspaceTeardown} from './setup_teardown.js';
 
 export function testAWorkspace() {
   setup(function () {
@@ -38,14 +37,14 @@ export function testAWorkspace() {
 
   function assertBlockVarModelName(workspace, blockIndex, name) {
     const block = workspace.getTopBlocks(false)[blockIndex];
-    assert.exists(block, 'Block at topBlocks[' + blockIndex + ']');
+    chai.assert.exists(block, 'Block at topBlocks[' + blockIndex + ']');
     const varModel = block.getVarModels()[0];
-    assert.exists(
+    chai.assert.exists(
       varModel,
       'VariableModel for block at topBlocks[' + blockIndex + ']',
     );
     const blockVarName = varModel.name;
-    assert.equal(
+    chai.assert.equal(
       blockVarName,
       name,
       'VariableModel name for block at topBlocks[' + blockIndex + ']',
@@ -73,9 +72,9 @@ export function testAWorkspace() {
       this.workspace.newBlock('');
 
       this.workspace.clear();
-      assert.equal(this.workspace.getTopBlocks(false).length, 0);
+      chai.assert.equal(this.workspace.getTopBlocks(false).length, 0);
       const varMapLength = this.workspace.getVariableMap().variableMap.size;
-      assert.equal(varMapLength, 0);
+      chai.assert.equal(varMapLength, 0);
     });
 
     test('No variables', function () {
@@ -83,9 +82,9 @@ export function testAWorkspace() {
       this.workspace.newBlock('');
 
       this.workspace.clear();
-      assert.equal(this.workspace.getTopBlocks(false).length, 0);
+      chai.assert.equal(this.workspace.getTopBlocks(false).length, 0);
       const varMapLength = this.workspace.getVariableMap().variableMap.size;
-      assert.equal(varMapLength, 0);
+      chai.assert.equal(varMapLength, 0);
     });
   });
 
@@ -100,35 +99,37 @@ export function testAWorkspace() {
 
     test('deleteVariableById(id2) one usage', function () {
       // Deleting variable one usage should not trigger confirm dialog.
-      const stub = sinon.stub(window, 'confirm').returns(true);
+      const stub = sinon
+        .stub(Blockly.dialog.TEST_ONLY, 'confirmInternal')
+        .callsArgWith(1, true);
       this.workspace.deleteVariableById('id2');
 
       sinon.assert.notCalled(stub);
       const variable = this.workspace.getVariableById('id2');
-      assert.isNull(variable);
+      chai.assert.isNull(variable);
       assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
       assertBlockVarModelName(this.workspace, 0, 'name1');
-
-      stub.restore();
     });
 
     test('deleteVariableById(id1) multiple usages confirm', function () {
       // Deleting variable with multiple usages triggers confirm dialog.
-      const stub = sinon.stub(window, 'confirm').returns(true);
+      const stub = sinon
+        .stub(Blockly.dialog.TEST_ONLY, 'confirmInternal')
+        .callsArgWith(1, true);
       this.workspace.deleteVariableById('id1');
 
       sinon.assert.calledOnce(stub);
       const variable = this.workspace.getVariableById('id1');
-      assert.isNull(variable);
+      chai.assert.isNull(variable);
       assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
       assertBlockVarModelName(this.workspace, 0, 'name2');
-
-      stub.restore();
     });
 
     test('deleteVariableById(id1) multiple usages cancel', function () {
       // Deleting variable with multiple usages triggers confirm dialog.
-      const stub = sinon.stub(window, 'confirm').returns(false);
+      const stub = sinon
+        .stub(Blockly.dialog.TEST_ONLY, 'confirmInternal')
+        .callsArgWith(1, false);
       this.workspace.deleteVariableById('id1');
 
       sinon.assert.calledOnce(stub);
@@ -137,8 +138,6 @@ export function testAWorkspace() {
       assertBlockVarModelName(this.workspace, 0, 'name1');
       assertBlockVarModelName(this.workspace, 1, 'name1');
       assertBlockVarModelName(this.workspace, 2, 'name2');
-
-      stub.restore();
     });
   });
 
@@ -151,7 +150,7 @@ export function testAWorkspace() {
       this.workspace.renameVariableById('id1', 'name2');
       assertVariableValues(this.workspace, 'name2', 'type1', 'id1');
       // Renaming should not have created a new variable.
-      assert.equal(this.workspace.getAllVariables().length, 1);
+      chai.assert.equal(this.workspace.getAllVariables().length, 1);
     });
 
     test('Reference exists rename to name2', function () {
@@ -160,7 +159,7 @@ export function testAWorkspace() {
       this.workspace.renameVariableById('id1', 'name2');
       assertVariableValues(this.workspace, 'name2', 'type1', 'id1');
       // Renaming should not have created a new variable.
-      assert.equal(this.workspace.getAllVariables().length, 1);
+      chai.assert.equal(this.workspace.getAllVariables().length, 1);
       assertBlockVarModelName(this.workspace, 0, 'name2');
     });
 
@@ -170,7 +169,7 @@ export function testAWorkspace() {
       this.workspace.renameVariableById('id1', 'Name1');
       assertVariableValues(this.workspace, 'Name1', 'type1', 'id1');
       // Renaming should not have created a new variable.
-      assert.equal(this.workspace.getAllVariables().length, 1);
+      chai.assert.equal(this.workspace.getAllVariables().length, 1);
       assertBlockVarModelName(this.workspace, 0, 'Name1');
     });
 
@@ -185,9 +184,9 @@ export function testAWorkspace() {
         assertVariableValues(this.workspace, 'name2', 'type1', 'id2');
         // The first variable should have been deleted.
         const variable = this.workspace.getVariableById('id1');
-        assert.isNull(variable);
+        chai.assert.isNull(variable);
         // There should only be one variable left.
-        assert.equal(this.workspace.getAllVariables().length, 1);
+        chai.assert.equal(this.workspace.getAllVariables().length, 1);
 
         // Both blocks should now reference variable with name2.
         assertBlockVarModelName(this.workspace, 0, 'name2');
@@ -219,9 +218,9 @@ export function testAWorkspace() {
         assertVariableValues(this.workspace, 'Name2', 'type1', 'id2');
         // The first variable should have been deleted.
         const variable = this.workspace.getVariableById('id1');
-        assert.isNull(variable);
+        chai.assert.isNull(variable);
         // There should only be one variable left.
-        assert.equal(this.workspace.getAllVariables().length, 1);
+        chai.assert.equal(this.workspace.getAllVariables().length, 1);
 
         // Both blocks should now reference variable with Name2.
         assertBlockVarModelName(this.workspace, 0, 'Name2');
@@ -248,30 +247,30 @@ export function testAWorkspace() {
 
   suite('getTopBlocks(ordered=true)', function () {
     test('Empty workspace', function () {
-      assert.equal(this.workspace.getTopBlocks(true).length, 0);
+      chai.assert.equal(this.workspace.getTopBlocks(true).length, 0);
     });
 
     test('Flat workspace one block', function () {
       this.workspace.newBlock('');
-      assert.equal(this.workspace.getTopBlocks(true).length, 1);
+      chai.assert.equal(this.workspace.getTopBlocks(true).length, 1);
     });
 
     test('Flat workspace one block after dispose', function () {
       const blockA = this.workspace.newBlock('');
       this.workspace.newBlock('');
       blockA.dispose();
-      assert.equal(this.workspace.getTopBlocks(true).length, 1);
+      chai.assert.equal(this.workspace.getTopBlocks(true).length, 1);
     });
 
     test('Flat workspace two blocks', function () {
       this.workspace.newBlock('');
       this.workspace.newBlock('');
-      assert.equal(this.workspace.getTopBlocks(true).length, 2);
+      chai.assert.equal(this.workspace.getTopBlocks(true).length, 2);
     });
 
     test('Clear', function () {
       this.workspace.clear();
-      assert.equal(
+      chai.assert.equal(
         this.workspace.getTopBlocks(true).length,
         0,
         'Clear empty workspace',
@@ -279,72 +278,72 @@ export function testAWorkspace() {
       this.workspace.newBlock('');
       this.workspace.newBlock('');
       this.workspace.clear();
-      assert.equal(this.workspace.getTopBlocks(true).length, 0);
+      chai.assert.equal(this.workspace.getTopBlocks(true).length, 0);
     });
   });
 
   suite('getTopBlocks(ordered=false)', function () {
     test('Empty workspace', function () {
-      assert.equal(this.workspace.getTopBlocks(false).length, 0);
+      chai.assert.equal(this.workspace.getTopBlocks(false).length, 0);
     });
 
     test('Flat workspace one block', function () {
       this.workspace.newBlock('');
-      assert.equal(this.workspace.getTopBlocks(false).length, 1);
+      chai.assert.equal(this.workspace.getTopBlocks(false).length, 1);
     });
 
     test('Flat workspace one block after dispose', function () {
       const blockA = this.workspace.newBlock('');
       this.workspace.newBlock('');
       blockA.dispose();
-      assert.equal(this.workspace.getTopBlocks(false).length, 1);
+      chai.assert.equal(this.workspace.getTopBlocks(false).length, 1);
     });
 
     test('Flat workspace two blocks', function () {
       this.workspace.newBlock('');
       this.workspace.newBlock('');
-      assert.equal(this.workspace.getTopBlocks(false).length, 2);
+      chai.assert.equal(this.workspace.getTopBlocks(false).length, 2);
     });
 
     test('Clear empty workspace', function () {
       this.workspace.clear();
-      assert.equal(this.workspace.getTopBlocks(false).length, 0);
+      chai.assert.equal(this.workspace.getTopBlocks(false).length, 0);
     });
 
     test('Clear non-empty workspace', function () {
       this.workspace.newBlock('');
       this.workspace.newBlock('');
       this.workspace.clear();
-      assert.equal(this.workspace.getTopBlocks(false).length, 0);
+      chai.assert.equal(this.workspace.getTopBlocks(false).length, 0);
     });
   });
 
   suite('getAllBlocks', function () {
     test('Empty workspace', function () {
-      assert.equal(this.workspace.getAllBlocks(true).length, 0);
+      chai.assert.equal(this.workspace.getAllBlocks(true).length, 0);
     });
 
     test('Flat workspace one block', function () {
       this.workspace.newBlock('');
-      assert.equal(this.workspace.getAllBlocks(true).length, 1);
+      chai.assert.equal(this.workspace.getAllBlocks(true).length, 1);
     });
 
     test('Flat workspace one block after dispose', function () {
       const blockA = this.workspace.newBlock('');
       this.workspace.newBlock('');
       blockA.dispose();
-      assert.equal(this.workspace.getAllBlocks(true).length, 1);
+      chai.assert.equal(this.workspace.getAllBlocks(true).length, 1);
     });
 
     test('Flat workspace two blocks', function () {
       this.workspace.newBlock('');
       this.workspace.newBlock('');
-      assert.equal(this.workspace.getAllBlocks(true).length, 2);
+      chai.assert.equal(this.workspace.getAllBlocks(true).length, 2);
     });
 
     test('Clear', function () {
       this.workspace.clear();
-      assert.equal(
+      chai.assert.equal(
         this.workspace.getAllBlocks(true).length,
         0,
         'Clear empty workspace',
@@ -352,7 +351,7 @@ export function testAWorkspace() {
       this.workspace.newBlock('');
       this.workspace.newBlock('');
       this.workspace.clear();
-      assert.equal(this.workspace.getAllBlocks(true).length, 0);
+      chai.assert.equal(this.workspace.getAllBlocks(true).length, 0);
     });
   });
 
@@ -363,35 +362,35 @@ export function testAWorkspace() {
     });
 
     test('No block limit', function () {
-      assert.equal(this.workspace.remainingCapacity(), Infinity);
+      chai.assert.equal(this.workspace.remainingCapacity(), Infinity);
     });
 
     test('Under block limit', function () {
       this.workspace.options.maxBlocks = 3;
-      assert.equal(this.workspace.remainingCapacity(), 1);
+      chai.assert.equal(this.workspace.remainingCapacity(), 1);
       this.workspace.options.maxBlocks = 4;
-      assert.equal(this.workspace.remainingCapacity(), 2);
+      chai.assert.equal(this.workspace.remainingCapacity(), 2);
     });
 
     test('At block limit', function () {
       this.workspace.options.maxBlocks = 2;
-      assert.equal(this.workspace.remainingCapacity(), 0);
+      chai.assert.equal(this.workspace.remainingCapacity(), 0);
     });
 
     test('At block limit of 0 after clear', function () {
       this.workspace.options.maxBlocks = 0;
       this.workspace.clear();
-      assert.equal(this.workspace.remainingCapacity(), 0);
+      chai.assert.equal(this.workspace.remainingCapacity(), 0);
     });
 
     test('Over block limit', function () {
       this.workspace.options.maxBlocks = 1;
-      assert.equal(this.workspace.remainingCapacity(), -1);
+      chai.assert.equal(this.workspace.remainingCapacity(), -1);
     });
 
     test('Over block limit of 0', function () {
       this.workspace.options.maxBlocks = 0;
-      assert.equal(this.workspace.remainingCapacity(), -2);
+      chai.assert.equal(this.workspace.remainingCapacity(), -2);
     });
   });
 
@@ -403,7 +402,7 @@ export function testAWorkspace() {
     });
 
     test('No instance limit', function () {
-      assert.equal(
+      chai.assert.equal(
         this.workspace.remainingCapacityOfType('get_var_block'),
         Infinity,
       );
@@ -411,13 +410,13 @@ export function testAWorkspace() {
 
     test('Under instance limit', function () {
       this.workspace.options.maxInstances['get_var_block'] = 3;
-      assert.equal(
+      chai.assert.equal(
         this.workspace.remainingCapacityOfType('get_var_block'),
         1,
         'With maxInstances limit 3',
       );
       this.workspace.options.maxInstances['get_var_block'] = 4;
-      assert.equal(
+      chai.assert.equal(
         this.workspace.remainingCapacityOfType('get_var_block'),
         2,
         'With maxInstances limit 4',
@@ -429,13 +428,13 @@ export function testAWorkspace() {
       this.workspace.newBlock('');
       this.workspace.newBlock('');
       this.workspace.options.maxInstances['get_var_block'] = 3;
-      assert.equal(
+      chai.assert.equal(
         this.workspace.remainingCapacityOfType('get_var_block'),
         1,
         'With maxInstances limit 3',
       );
       this.workspace.options.maxInstances['get_var_block'] = 4;
-      assert.equal(
+      chai.assert.equal(
         this.workspace.remainingCapacityOfType('get_var_block'),
         2,
         'With maxInstances limit 4',
@@ -444,7 +443,7 @@ export function testAWorkspace() {
 
     test('At instance limit', function () {
       this.workspace.options.maxInstances['get_var_block'] = 2;
-      assert.equal(
+      chai.assert.equal(
         this.workspace.remainingCapacityOfType('get_var_block'),
         0,
         'With maxInstances limit 2',
@@ -454,7 +453,10 @@ export function testAWorkspace() {
     test('At instance limit of 0 after clear', function () {
       this.workspace.clear();
       this.workspace.options.maxInstances['get_var_block'] = 0;
-      assert.equal(this.workspace.remainingCapacityOfType('get_var_block'), 0);
+      chai.assert.equal(
+        this.workspace.remainingCapacityOfType('get_var_block'),
+        0,
+      );
     });
 
     test('At instance limit with multiple block types', function () {
@@ -462,7 +464,7 @@ export function testAWorkspace() {
       this.workspace.newBlock('');
       this.workspace.newBlock('');
       this.workspace.options.maxInstances['get_var_block'] = 2;
-      assert.equal(
+      chai.assert.equal(
         this.workspace.remainingCapacityOfType('get_var_block'),
         0,
         'With maxInstances limit 2',
@@ -475,12 +477,15 @@ export function testAWorkspace() {
       this.workspace.newBlock('');
       this.workspace.options.maxInstances['get_var_block'] = 0;
       this.workspace.clear();
-      assert.equal(this.workspace.remainingCapacityOfType('get_var_block'), 0);
+      chai.assert.equal(
+        this.workspace.remainingCapacityOfType('get_var_block'),
+        0,
+      );
     });
 
     test('Over instance limit', function () {
       this.workspace.options.maxInstances['get_var_block'] = 1;
-      assert.equal(
+      chai.assert.equal(
         this.workspace.remainingCapacityOfType('get_var_block'),
         -1,
         'With maxInstances limit 1',
@@ -489,7 +494,7 @@ export function testAWorkspace() {
 
     test('Over instance limit of 0', function () {
       this.workspace.options.maxInstances['get_var_block'] = 0;
-      assert.equal(
+      chai.assert.equal(
         this.workspace.remainingCapacityOfType('get_var_block'),
         -2,
         'With maxInstances limit 0',
@@ -501,7 +506,7 @@ export function testAWorkspace() {
       this.workspace.newBlock('');
       this.workspace.newBlock('');
       this.workspace.options.maxInstances['get_var_block'] = 1;
-      assert.equal(
+      chai.assert.equal(
         this.workspace.remainingCapacityOfType('get_var_block'),
         -1,
         'With maxInstances limit 1',
@@ -513,7 +518,7 @@ export function testAWorkspace() {
       this.workspace.newBlock('');
       this.workspace.newBlock('');
       this.workspace.options.maxInstances['get_var_block'] = 0;
-      assert.equal(
+      chai.assert.equal(
         this.workspace.remainingCapacityOfType('get_var_block'),
         -2,
         'With maxInstances limit 0',
@@ -531,26 +536,26 @@ export function testAWorkspace() {
     test('Under block limit and no instance limit', function () {
       this.workspace.options.maxBlocks = 3;
       const typeCountsMap = {'get_var_block': 1};
-      assert.isTrue(this.workspace.isCapacityAvailable(typeCountsMap));
+      chai.assert.isTrue(this.workspace.isCapacityAvailable(typeCountsMap));
     });
 
     test('At block limit and no instance limit', function () {
       this.workspace.options.maxBlocks = 2;
       const typeCountsMap = {'get_var_block': 1};
-      assert.isFalse(this.workspace.isCapacityAvailable(typeCountsMap));
+      chai.assert.isFalse(this.workspace.isCapacityAvailable(typeCountsMap));
     });
 
     test('Over block limit of 0 and no instance limit', function () {
       this.workspace.options.maxBlocks = 0;
       const typeCountsMap = {'get_var_block': 1};
-      assert.isFalse(this.workspace.isCapacityAvailable(typeCountsMap));
+      chai.assert.isFalse(this.workspace.isCapacityAvailable(typeCountsMap));
     });
 
     test('Over block limit but under instance limit', function () {
       this.workspace.options.maxBlocks = 1;
       this.workspace.options.maxInstances['get_var_block'] = 3;
       const typeCountsMap = {'get_var_block': 1};
-      assert.isFalse(
+      chai.assert.isFalse(
         this.workspace.isCapacityAvailable(typeCountsMap),
         'With maxBlocks limit 1 and maxInstances limit 3',
       );
@@ -560,7 +565,7 @@ export function testAWorkspace() {
       this.workspace.options.maxBlocks = 0;
       this.workspace.options.maxInstances['get_var_block'] = 3;
       const typeCountsMap = {'get_var_block': 1};
-      assert.isFalse(
+      chai.assert.isFalse(
         this.workspace.isCapacityAvailable(typeCountsMap),
         'With maxBlocks limit 0 and maxInstances limit 3',
       );
@@ -570,7 +575,7 @@ export function testAWorkspace() {
       this.workspace.options.maxBlocks = 1;
       this.workspace.options.maxInstances['get_var_block'] = 2;
       const typeCountsMap = {'get_var_block': 1};
-      assert.isFalse(
+      chai.assert.isFalse(
         this.workspace.isCapacityAvailable(typeCountsMap),
         'With maxBlocks limit 1 and maxInstances limit 2',
       );
@@ -580,7 +585,7 @@ export function testAWorkspace() {
       this.workspace.options.maxBlocks = 1;
       this.workspace.options.maxInstances['get_var_block'] = 1;
       const typeCountsMap = {'get_var_block': 1};
-      assert.isFalse(
+      chai.assert.isFalse(
         this.workspace.isCapacityAvailable(typeCountsMap),
         'With maxBlocks limit 1 and maxInstances limit 1',
       );
@@ -590,7 +595,7 @@ export function testAWorkspace() {
       this.workspace.options.maxBlocks = 0;
       this.workspace.options.maxInstances['get_var_block'] = 1;
       const typeCountsMap = {'get_var_block': 1};
-      assert.isFalse(
+      chai.assert.isFalse(
         this.workspace.isCapacityAvailable(typeCountsMap),
         'With maxBlocks limit 0 and maxInstances limit 1',
       );
@@ -600,7 +605,7 @@ export function testAWorkspace() {
       this.workspace.options.maxBlocks = 1;
       this.workspace.options.maxInstances['get_var_block'] = 0;
       const typeCountsMap = {'get_var_block': 1};
-      assert.isFalse(
+      chai.assert.isFalse(
         this.workspace.isCapacityAvailable(typeCountsMap),
         'With maxBlocks limit 1 and maxInstances limit 0',
       );
@@ -610,7 +615,7 @@ export function testAWorkspace() {
       this.workspace.options.maxBlocks = 0;
       this.workspace.options.maxInstances['get_var_block'] = 0;
       const typeCountsMap = {'get_var_block': 1};
-      assert.isFalse(this.workspace.isCapacityAvailable(typeCountsMap));
+      chai.assert.isFalse(this.workspace.isCapacityAvailable(typeCountsMap));
     });
   });
 
@@ -626,12 +631,12 @@ export function testAWorkspace() {
     });
 
     test('Trivial', function () {
-      assert.equal(
+      chai.assert.equal(
         Blockly.Workspace.getById(this.workspace.id),
         this.workspace,
         'Find workspace',
       );
-      assert.equal(
+      chai.assert.equal(
         Blockly.Workspace.getById(this.workspaceB.id),
         this.workspaceB,
         'Find workspaceB',
@@ -639,16 +644,16 @@ export function testAWorkspace() {
     });
 
     test('Null id', function () {
-      assert.isNull(Blockly.Workspace.getById(null));
+      chai.assert.isNull(Blockly.Workspace.getById(null));
     });
 
     test('Non-existent id', function () {
-      assert.isNull(Blockly.Workspace.getById('badId'));
+      chai.assert.isNull(Blockly.Workspace.getById('badId'));
     });
 
     test('After dispose', function () {
       this.workspaceB.dispose();
-      assert.isNull(Blockly.Workspace.getById(this.workspaceB.id));
+      chai.assert.isNull(Blockly.Workspace.getById(this.workspaceB.id));
     });
   });
 
@@ -666,28 +671,37 @@ export function testAWorkspace() {
     });
 
     test('Trivial', function () {
-      assert.equal(this.workspace.getBlockById(this.blockA.id), this.blockA);
-      assert.equal(this.workspace.getBlockById(this.blockB.id), this.blockB);
+      chai.assert.equal(
+        this.workspace.getBlockById(this.blockA.id),
+        this.blockA,
+      );
+      chai.assert.equal(
+        this.workspace.getBlockById(this.blockB.id),
+        this.blockB,
+      );
     });
 
     test('Null id', function () {
-      assert.isNull(this.workspace.getBlockById(null));
+      chai.assert.isNull(this.workspace.getBlockById(null));
     });
 
     test('Non-existent id', function () {
-      assert.isNull(this.workspace.getBlockById('badId'));
+      chai.assert.isNull(this.workspace.getBlockById('badId'));
     });
 
     test('After dispose', function () {
       this.blockA.dispose();
-      assert.isNull(this.workspace.getBlockById(this.blockA.id));
-      assert.equal(this.workspace.getBlockById(this.blockB.id), this.blockB);
+      chai.assert.isNull(this.workspace.getBlockById(this.blockA.id));
+      chai.assert.equal(
+        this.workspace.getBlockById(this.blockB.id),
+        this.blockB,
+      );
     });
 
     test('After clear', function () {
       this.workspace.clear();
-      assert.isNull(this.workspace.getBlockById(this.blockA.id));
-      assert.isNull(this.workspace.getBlockById(this.blockB.id));
+      chai.assert.isNull(this.workspace.getBlockById(this.blockA.id));
+      chai.assert.isNull(this.workspace.getBlockById(this.blockB.id));
     });
   });
 
@@ -702,16 +716,16 @@ export function testAWorkspace() {
       const expectedString =
         '\n' + Blockly.Xml.domToPrettyText(expected) + '\n';
 
-      assert.equal(actual.tagName, expected.tagName);
+      chai.assert.equal(actual.tagName, expected.tagName);
       for (let i = 0, attr; (attr = expected.attributes[i]); i++) {
-        assert.equal(
+        chai.assert.equal(
           actual.getAttribute(attr.name),
           attr.value,
           `expected attribute ${attr.name} on ${actualString} to match ` +
             `${expectedString}`,
         );
       }
-      assert.equal(
+      chai.assert.equal(
         actual.childElementCount,
         expected.childElementCount,
         `expected node ${actualString} to have the same children as node ` +
@@ -767,9 +781,7 @@ export function testAWorkspace() {
         const xml = Blockly.utils.xml.textToDom(xmlText);
         Blockly.Xml.domToBlock(xml, this.workspace);
         this.workspace.getTopBlocks()[0].dispose(false);
-        this.clock.runAll();
         this.workspace.undo();
-        this.clock.runAll();
         const newXml = Blockly.Xml.workspaceToDom(this.workspace);
         assertNodesEqual(newXml.firstChild, xml);
       }
@@ -897,14 +909,11 @@ export function testAWorkspace() {
       function testUndoConnect(xmlText, parentId, childId, func) {
         const xml = Blockly.utils.xml.textToDom(xmlText);
         Blockly.Xml.domToWorkspace(xml, this.workspace);
-        this.clock.runAll();
 
         const parent = this.workspace.getBlockById(parentId);
         const child = this.workspace.getBlockById(childId);
         func.call(this, parent, child);
-        this.clock.runAll();
         this.workspace.undo();
-        this.clock.runAll();
 
         const newXml = Blockly.Xml.workspaceToDom(this.workspace);
         assertNodesEqual(newXml, xml);
@@ -913,8 +922,8 @@ export function testAWorkspace() {
       test('Stack', function () {
         const xml =
           '<xml>' +
-          '  <block type="stack_block" id="1" x="10" y="10"></block>' +
-          '  <block type="stack_block" id="2" x="50" y="50"></block>' +
+          '  <block type="stack_block" id="1"></block>' +
+          '  <block type="stack_block" id="2"></block>' +
           '</xml>';
 
         testUndoConnect.call(this, xml, '1', '2', (parent, child) => {
@@ -925,8 +934,8 @@ export function testAWorkspace() {
       test('Row', function () {
         const xml =
           '<xml>' +
-          '  <block type="row_block" id="1" x="10" y="10"></block>' +
-          '  <block type="row_block" id="2" x="50" y="50"></block>' +
+          '  <block type="row_block" id="1"></block>' +
+          '  <block type="row_block" id="2"></block>' +
           '</xml>';
 
         testUndoConnect.call(this, xml, '1', '2', (parent, child) => {
@@ -937,8 +946,8 @@ export function testAWorkspace() {
       test('Statement', function () {
         const xml =
           '<xml>' +
-          '  <block type="statement_block" id="1" x="10" y="10"></block>' +
-          '  <block type="stack_block" id="2" x="50" y="50"></block>' +
+          '  <block type="statement_block" id="1"></block>' +
+          '  <block type="stack_block" id="2"></block>' +
           '</xml>';
 
         testUndoConnect.call(this, xml, '1', '2', (parent, child) => {
@@ -951,12 +960,12 @@ export function testAWorkspace() {
       test('Stack w/ child', function () {
         const xml =
           '<xml>' +
-          '  <block type="stack_block" id="1" x="10" y="10">' +
+          '  <block type="stack_block" id="1">' +
           '    <next>' +
           '      <block type="stack_block" id="3"></block>' +
           '    </next>' +
           '  </block>' +
-          '  <block type="stack_block" id="2" x="50" y="50"></block>' +
+          '  <block type="stack_block" id="2"></block>' +
           '</xml>';
 
         testUndoConnect.call(this, xml, '1', '2', (parent, child) => {
@@ -967,12 +976,12 @@ export function testAWorkspace() {
       test('Row w/ child', function () {
         const xml =
           '<xml>' +
-          '  <block type="row_block" id="1" x="10" y="10">' +
+          '  <block type="row_block" id="1">' +
           '    <value name="INPUT">' +
           '      <block type="row_block" id="3"></block>' +
           '    </value>' +
           '  </block>' +
-          '  <block type="row_block" id="2" x="50" y="50"></block>' +
+          '  <block type="row_block" id="2"></block>' +
           '</xml>';
 
         testUndoConnect.call(this, xml, '1', '2', (parent, child) => {
@@ -983,12 +992,12 @@ export function testAWorkspace() {
       test('Statement w/ child', function () {
         const xml =
           '<xml>' +
-          '  <block type="statement_block" id="1" x="10" y="10">' +
+          '  <block type="statement_block" id="1">' +
           '    <statement name="STATEMENT">' +
           '      <block type="stack_block" id="3"></block>' +
           '    </statement>' +
           '  </block>' +
-          '  <block type="stack_block" id="2" x="100" y="100"></block>' +
+          '  <block type="stack_block" id="2"></block>' +
           '</xml>';
 
         testUndoConnect.call(this, xml, '1', '2', (parent, child) => {
@@ -1001,12 +1010,12 @@ export function testAWorkspace() {
       test('Stack w/ shadow', function () {
         const xml =
           '<xml>' +
-          '  <block type="stack_block" id="1" x="10" y="10">' +
+          '  <block type="stack_block" id="1">' +
           '    <next>' +
           '      <shadow type="stack_block" id="3"></shadow>' +
           '    </next>' +
           '  </block>' +
-          '  <block type="stack_block" id="2" x="50" y="50"></block>' +
+          '  <block type="stack_block" id="2"></block>' +
           '</xml>';
 
         testUndoConnect.call(this, xml, '1', '2', (parent, child) => {
@@ -1017,12 +1026,12 @@ export function testAWorkspace() {
       test('Row w/ shadow', function () {
         const xml =
           '<xml>' +
-          '  <block type="row_block" id="1" x="10" y="10">' +
+          '  <block type="row_block" id="1">' +
           '    <value name="INPUT">' +
           '      <shadow type="row_block" id="3"></shadow>' +
           '    </value>' +
           '  </block>' +
-          '  <block type="row_block" id="2" x="50" y="50"></block>' +
+          '  <block type="row_block" id="2"></block>' +
           '</xml>';
 
         testUndoConnect.call(this, xml, '1', '2', (parent, child) => {
@@ -1033,12 +1042,12 @@ export function testAWorkspace() {
       test('Statement w/ shadow', function () {
         const xml =
           '<xml>' +
-          '  <block type="statement_block" id="1" x="10" y="10">' +
+          '  <block type="statement_block" id="1">' +
           '    <statement name="STATEMENT">' +
           '      <shadow type="stack_block" id="3"></shadow>' +
           '    </statement>' +
           '  </block>' +
-          '  <block type="stack_block" id="2" x="100" y="100"></block>' +
+          '  <block type="stack_block" id="2"></block>' +
           '</xml>';
 
         testUndoConnect.call(this, xml, '1', '2', (parent, child) => {
@@ -1093,7 +1102,6 @@ export function testAWorkspace() {
       function testUndoDisconnect(xmlText, childId) {
         const xml = Blockly.utils.xml.textToDom(xmlText);
         Blockly.Xml.domToWorkspace(xml, this.workspace);
-        this.clock.runAll();
 
         const child = this.workspace.getBlockById(childId);
         if (child.outputConnection) {
@@ -1101,9 +1109,7 @@ export function testAWorkspace() {
         } else {
           child.previousConnection.disconnect();
         }
-        this.clock.runAll();
         this.workspace.undo();
-        this.clock.runAll();
 
         const newXml = Blockly.Xml.workspaceToDom(this.workspace);
         assertNodesEqual(newXml, xml);
@@ -1206,7 +1212,7 @@ export function testAWorkspace() {
           '  </block>' +
           '</xml>';
         testUndoDisconnect.call(this, xml, '2');
-        assert.equal(
+        chai.assert.equal(
           this.workspace.getAllBlocks().length,
           2,
           'expected there to only be 2 blocks on the workspace ' +
@@ -1225,7 +1231,7 @@ export function testAWorkspace() {
           '  </block>' +
           '</xml>';
         testUndoDisconnect.call(this, xml, '2');
-        assert.equal(
+        chai.assert.equal(
           this.workspace.getAllBlocks().length,
           2,
           'expected there to only be 2 blocks on the workspace ' +
@@ -1256,26 +1262,22 @@ export function testAWorkspace() {
       suite('createVariable', function () {
         test('Undo only', function () {
           createTwoVarsDifferentTypes(this.workspace);
-          this.clock.runAll();
 
           this.workspace.undo();
-          this.clock.runAll();
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
-          assert.isNull(this.workspace.getVariableById('id2'));
+          chai.assert.isNull(this.workspace.getVariableById('id2'));
 
           this.workspace.undo();
-          assert.isNull(this.workspace.getVariableById('id1'));
-          assert.isNull(this.workspace.getVariableById('id2'));
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id2'));
         });
 
         test('Undo and redo', function () {
           createTwoVarsDifferentTypes(this.workspace);
-          this.clock.runAll();
 
           this.workspace.undo();
-          this.clock.runAll();
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
-          assert.isNull(this.workspace.getVariableById('id2'));
+          chai.assert.isNull(this.workspace.getVariableById('id2'));
 
           this.workspace.undo(true);
 
@@ -1285,31 +1287,27 @@ export function testAWorkspace() {
 
           this.workspace.undo();
           this.workspace.undo();
-          assert.isNull(this.workspace.getVariableById('id1'));
-          assert.isNull(this.workspace.getVariableById('id2'));
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id2'));
           this.workspace.undo(true);
 
           // Expect that variable 'id1' is recreated
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
-          assert.isNull(this.workspace.getVariableById('id2'));
+          chai.assert.isNull(this.workspace.getVariableById('id2'));
         });
       });
 
       suite('deleteVariableById', function () {
         test('Undo only no usages', function () {
           createTwoVarsDifferentTypes(this.workspace);
-          this.clock.runAll();
           this.workspace.deleteVariableById('id1');
           this.workspace.deleteVariableById('id2');
-          this.clock.runAll();
 
           this.workspace.undo();
-          this.clock.runAll();
-          assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
           assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
 
           this.workspace.undo();
-          this.clock.runAll();
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
           assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
         });
@@ -1318,19 +1316,15 @@ export function testAWorkspace() {
           createTwoVarsDifferentTypes(this.workspace);
           // Create blocks to refer to both of them.
           createVarBlocksNoEvents(this.workspace, ['id1', 'id2']);
-          this.clock.runAll();
           this.workspace.deleteVariableById('id1');
           this.workspace.deleteVariableById('id2');
-          this.clock.runAll();
 
           this.workspace.undo();
-          this.clock.runAll();
           assertBlockVarModelName(this.workspace, 0, 'name2');
-          assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
           assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
 
           this.workspace.undo();
-          this.clock.runAll();
           assertBlockVarModelName(this.workspace, 0, 'name2');
           assertBlockVarModelName(this.workspace, 1, 'name1');
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
@@ -1339,33 +1333,26 @@ export function testAWorkspace() {
 
         test('Reference exists no usages', function () {
           createTwoVarsDifferentTypes(this.workspace);
-          this.clock.runAll();
           this.workspace.deleteVariableById('id1');
           this.workspace.deleteVariableById('id2');
-          this.clock.runAll();
 
           this.workspace.undo();
-          this.clock.runAll();
-          assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
           assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
 
           this.workspace.undo(true);
-          this.clock.runAll();
           // Expect that both variables are deleted
-          assert.isNull(this.workspace.getVariableById('id1'));
-          assert.isNull(this.workspace.getVariableById('id2'));
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id2'));
 
           this.workspace.undo();
-          this.clock.runAll();
           this.workspace.undo();
-          this.clock.runAll();
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
           assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
 
           this.workspace.undo(true);
-          this.clock.runAll();
           // Expect that variable 'id2' is recreated
-          assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
           assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
         });
 
@@ -1373,45 +1360,37 @@ export function testAWorkspace() {
           createTwoVarsDifferentTypes(this.workspace);
           // Create blocks to refer to both of them.
           createVarBlocksNoEvents(this.workspace, ['id1', 'id2']);
-          this.clock.runAll();
           this.workspace.deleteVariableById('id1');
           this.workspace.deleteVariableById('id2');
-          this.clock.runAll();
 
           this.workspace.undo();
-          this.clock.runAll();
           assertBlockVarModelName(this.workspace, 0, 'name2');
-          assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
           assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
 
           this.workspace.undo(true);
-          this.clock.runAll();
           // Expect that both variables are deleted
-          assert.equal(this.workspace.getTopBlocks(false).length, 0);
-          assert.isNull(this.workspace.getVariableById('id1'));
-          assert.isNull(this.workspace.getVariableById('id2'));
+          chai.assert.equal(this.workspace.getTopBlocks(false).length, 0);
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id2'));
 
           this.workspace.undo();
-          this.clock.runAll();
           this.workspace.undo();
-          this.clock.runAll();
           assertBlockVarModelName(this.workspace, 0, 'name2');
           assertBlockVarModelName(this.workspace, 1, 'name1');
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
           assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
 
           this.workspace.undo(true);
-          this.clock.runAll();
           // Expect that variable 'id2' is recreated
           assertBlockVarModelName(this.workspace, 0, 'name2');
-          assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
           assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
         });
 
         test('Delete same variable twice no usages', function () {
           this.workspace.createVariable('name1', 'type1', 'id1');
           this.workspace.deleteVariableById('id1');
-          this.clock.runAll();
           const workspace = this.workspace;
           assertWarnings(() => {
             workspace.deleteVariableById('id1');
@@ -1419,31 +1398,29 @@ export function testAWorkspace() {
 
           // Check the undoStack only recorded one delete event.
           const undoStack = this.workspace.undoStack_;
-          assert.equal(undoStack[undoStack.length - 1].type, 'var_delete');
-          assert.notEqual(undoStack[undoStack.length - 2].type, 'var_delete');
+          chai.assert.equal(undoStack[undoStack.length - 1].type, 'var_delete');
+          chai.assert.notEqual(
+            undoStack[undoStack.length - 2].type,
+            'var_delete',
+          );
 
           // Undo delete
           this.workspace.undo();
-          this.clock.runAll();
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
 
           // Redo delete
           this.workspace.undo(true);
-          this.clock.runAll();
-          assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
 
           // Redo delete, nothing should happen
           this.workspace.undo(true);
-          this.clock.runAll();
-          assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
         });
 
         test('Delete same variable twice with usages', function () {
           this.workspace.createVariable('name1', 'type1', 'id1');
           createVarBlocksNoEvents(this.workspace, ['id1']);
-          this.clock.runAll();
           this.workspace.deleteVariableById('id1');
-          this.clock.runAll();
           const workspace = this.workspace;
           assertWarnings(() => {
             workspace.deleteVariableById('id1');
@@ -1451,27 +1428,27 @@ export function testAWorkspace() {
 
           // Check the undoStack only recorded one delete event.
           const undoStack = this.workspace.undoStack_;
-          assert.equal(undoStack[undoStack.length - 1].type, 'var_delete');
-          assert.equal(undoStack[undoStack.length - 2].type, 'delete');
-          assert.notEqual(undoStack[undoStack.length - 3].type, 'var_delete');
+          chai.assert.equal(undoStack[undoStack.length - 1].type, 'var_delete');
+          chai.assert.equal(undoStack[undoStack.length - 2].type, 'delete');
+          chai.assert.notEqual(
+            undoStack[undoStack.length - 3].type,
+            'var_delete',
+          );
 
           // Undo delete
           this.workspace.undo();
-          this.clock.runAll();
           assertBlockVarModelName(this.workspace, 0, 'name1');
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
 
           // Redo delete
           this.workspace.undo(true);
-          this.clock.runAll();
-          assert.equal(this.workspace.getTopBlocks(false).length, 0);
-          assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.equal(this.workspace.getTopBlocks(false).length, 0);
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
 
           // Redo delete, nothing should happen
           this.workspace.undo(true);
-          this.clock.runAll();
-          assert.equal(this.workspace.getTopBlocks(false).length, 0);
-          assert.isNull(this.workspace.getVariableById('id1'));
+          chai.assert.equal(this.workspace.getTopBlocks(false).length, 0);
+          chai.assert.isNull(this.workspace.getVariableById('id1'));
         });
       });
 
@@ -1482,58 +1459,46 @@ export function testAWorkspace() {
 
         test('Reference exists no usages rename to name2', function () {
           this.workspace.renameVariableById('id1', 'name2');
-          this.clock.runAll();
 
           this.workspace.undo();
-          this.clock.runAll();
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
 
           this.workspace.undo(true);
-          this.clock.runAll();
           assertVariableValues(this.workspace, 'name2', 'type1', 'id1');
         });
 
         test('Reference exists with usages rename to name2', function () {
           createVarBlocksNoEvents(this.workspace, ['id1']);
           this.workspace.renameVariableById('id1', 'name2');
-          this.clock.runAll();
 
           this.workspace.undo();
-          this.clock.runAll();
           assertBlockVarModelName(this.workspace, 0, 'name1');
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
 
           this.workspace.undo(true);
-          this.clock.runAll();
           assertBlockVarModelName(this.workspace, 0, 'name2');
           assertVariableValues(this.workspace, 'name2', 'type1', 'id1');
         });
 
         test('Reference exists different capitalization no usages rename to Name1', function () {
           this.workspace.renameVariableById('id1', 'Name1');
-          this.clock.runAll();
 
           this.workspace.undo();
-          this.clock.runAll();
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
 
           this.workspace.undo(true);
-          this.clock.runAll();
           assertVariableValues(this.workspace, 'Name1', 'type1', 'id1');
         });
 
         test('Reference exists different capitalization with usages rename to Name1', function () {
           createVarBlocksNoEvents(this.workspace, ['id1']);
           this.workspace.renameVariableById('id1', 'Name1');
-          this.clock.runAll();
 
           this.workspace.undo();
-          this.clock.runAll();
           assertBlockVarModelName(this.workspace, 0, 'name1');
           assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
 
           this.workspace.undo(true);
-          this.clock.runAll();
           assertBlockVarModelName(this.workspace, 0, 'Name1');
           assertVariableValues(this.workspace, 'Name1', 'type1', 'id1');
         });
@@ -1542,71 +1507,59 @@ export function testAWorkspace() {
           test('Same type no usages rename variable with id1 to name2', function () {
             this.workspace.createVariable('name2', 'type1', 'id2');
             this.workspace.renameVariableById('id1', 'name2');
-            this.clock.runAll();
 
             this.workspace.undo();
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type1', 'id2');
 
             this.workspace.undo(true);
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'name2', 'type1', 'id2');
-            assert.isNull(this.workspace.getVariableById('id1'));
+            chai.assert.isNull(this.workspace.getVariableById('id1'));
           });
 
           test('Same type with usages rename variable with id1 to name2', function () {
             this.workspace.createVariable('name2', 'type1', 'id2');
             createVarBlocksNoEvents(this.workspace, ['id1', 'id2']);
             this.workspace.renameVariableById('id1', 'name2');
-            this.clock.runAll();
 
             this.workspace.undo();
-            this.clock.runAll();
             assertBlockVarModelName(this.workspace, 0, 'name1');
             assertBlockVarModelName(this.workspace, 1, 'name2');
             assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type1', 'id2');
 
             this.workspace.undo(true);
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'name2', 'type1', 'id2');
-            assert.isNull(this.workspace.getVariableById('id1'));
+            chai.assert.isNull(this.workspace.getVariableById('id1'));
           });
 
           test('Same type different capitalization no usages rename variable with id1 to Name2', function () {
             this.workspace.createVariable('name2', 'type1', 'id2');
             this.workspace.renameVariableById('id1', 'Name2');
-            this.clock.runAll();
 
             this.workspace.undo();
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type1', 'id2');
 
             this.workspace.undo(true);
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'Name2', 'type1', 'id2');
-            assert.isNull(this.workspace.getVariable('name1'));
+            chai.assert.isNull(this.workspace.getVariable('name1'));
           });
 
           test('Same type different capitalization with usages rename variable with id1 to Name2', function () {
             this.workspace.createVariable('name2', 'type1', 'id2');
             createVarBlocksNoEvents(this.workspace, ['id1', 'id2']);
             this.workspace.renameVariableById('id1', 'Name2');
-            this.clock.runAll();
 
             this.workspace.undo();
-            this.clock.runAll();
             assertBlockVarModelName(this.workspace, 0, 'name1');
             assertBlockVarModelName(this.workspace, 1, 'name2');
             assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type1', 'id2');
 
             this.workspace.undo(true);
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'Name2', 'type1', 'id2');
-            assert.isNull(this.workspace.getVariableById('id1'));
+            chai.assert.isNull(this.workspace.getVariableById('id1'));
             assertBlockVarModelName(this.workspace, 0, 'Name2');
             assertBlockVarModelName(this.workspace, 1, 'Name2');
           });
@@ -1614,15 +1567,12 @@ export function testAWorkspace() {
           test('Different type no usages rename variable with id1 to name2', function () {
             this.workspace.createVariable('name2', 'type2', 'id2');
             this.workspace.renameVariableById('id1', 'name2');
-            this.clock.runAll();
 
             this.workspace.undo();
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
 
             this.workspace.undo(true);
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'name2', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
           });
@@ -1631,17 +1581,14 @@ export function testAWorkspace() {
             this.workspace.createVariable('name2', 'type2', 'id2');
             createVarBlocksNoEvents(this.workspace, ['id1', 'id2']);
             this.workspace.renameVariableById('id1', 'name2');
-            this.clock.runAll();
 
             this.workspace.undo();
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
             assertBlockVarModelName(this.workspace, 0, 'name1');
             assertBlockVarModelName(this.workspace, 1, 'name2');
 
             this.workspace.undo(true);
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'name2', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
             assertBlockVarModelName(this.workspace, 0, 'name2');
@@ -1651,15 +1598,12 @@ export function testAWorkspace() {
           test('Different type different capitalization no usages rename variable with id1 to Name2', function () {
             this.workspace.createVariable('name2', 'type2', 'id2');
             this.workspace.renameVariableById('id1', 'Name2');
-            this.clock.runAll();
 
             this.workspace.undo();
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
 
             this.workspace.undo(true);
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'Name2', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
           });
@@ -1668,17 +1612,14 @@ export function testAWorkspace() {
             this.workspace.createVariable('name2', 'type2', 'id2');
             createVarBlocksNoEvents(this.workspace, ['id1', 'id2']);
             this.workspace.renameVariableById('id1', 'Name2');
-            this.clock.runAll();
 
             this.workspace.undo();
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'name1', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
             assertBlockVarModelName(this.workspace, 0, 'name1');
             assertBlockVarModelName(this.workspace, 1, 'name2');
 
             this.workspace.undo(true);
-            this.clock.runAll();
             assertVariableValues(this.workspace, 'Name2', 'type1', 'id1');
             assertVariableValues(this.workspace, 'name2', 'type2', 'id2');
             assertBlockVarModelName(this.workspace, 0, 'Name2');

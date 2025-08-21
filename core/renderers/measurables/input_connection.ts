@@ -10,6 +10,7 @@ import type {BlockSvg} from '../../block_svg.js';
 import type {Input} from '../../inputs/input.js';
 import type {RenderedConnection} from '../../rendered_connection.js';
 import type {ConstantProvider} from '../common/constants.js';
+
 import {Connection} from './connection.js';
 import {Types} from './types.js';
 

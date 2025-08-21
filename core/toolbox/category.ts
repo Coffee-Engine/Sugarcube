@@ -16,11 +16,6 @@ import type {ICollapsibleToolboxItem} from '../interfaces/i_collapsible_toolbox_
 import type {ISelectableToolboxItem} from '../interfaces/i_selectable_toolbox_item.js';
 import type {IToolbox} from '../interfaces/i_toolbox.js';
 import type {IToolboxItem} from '../interfaces/i_toolbox_item.js';
-import * as registry from '../registry.js';
-import * as aria from '../utils/aria.js';
-import * as colourUtils from '../utils/colour.js';
-import * as dom from '../utils/dom.js';
-import * as parsing from '../utils/parsing.js';
 import type {
   CategoryInfo,
   DynamicCategoryInfo,
@@ -29,7 +24,13 @@ import type {
   FlyoutItemInfoArray,
   StaticCategoryInfo,
 } from '../utils/toolbox.js';
+import * as registry from '../registry.js';
+import * as aria from '../utils/aria.js';
+import * as colourUtils from '../utils/colour.js';
+import * as dom from '../utils/dom.js';
+import * as parsing from '../utils/parsing.js';
 import * as toolbox from '../utils/toolbox.js';
+
 import {ToolboxItem} from './toolbox_item.js';
 
 /**
@@ -130,15 +131,15 @@ export class ToolboxCategory
    */
   protected makeDefaultCssConfig_(): CssConfig {
     return {
-      'container': 'blocklyToolboxCategoryContainer',
-      'row': 'blocklyToolboxCategory',
+      'container': 'blocklyToolboxCategory',
+      'row': 'blocklyTreeRow',
       'rowcontentcontainer': 'blocklyTreeRowContentContainer',
-      'icon': 'blocklyToolboxCategoryIcon',
-      'label': 'blocklyToolboxCategoryLabel',
-      'contents': 'blocklyToolboxCategoryGroup',
-      'selected': 'blocklyToolboxSelected',
-      'openicon': 'blocklyToolboxCategoryIconOpen',
-      'closedicon': 'blocklyToolboxCategoryIconClosed',
+      'icon': 'blocklyTreeIcon',
+      'label': 'blocklyTreeLabel',
+      'contents': 'blocklyToolboxContents',
+      'selected': 'blocklyTreeSelected',
+      'openicon': 'blocklyTreeIconOpen',
+      'closedicon': 'blocklyTreeIconClosed',
     };
   }
 
@@ -225,10 +226,6 @@ export class ToolboxCategory
    */
   protected createContainer_(): HTMLDivElement {
     const container = document.createElement('div');
-    // Ensure that the category has a tab index to ensure it receives focus when
-    // clicked (since clicking isn't managed by the toolbox).
-    container.tabIndex = -1;
-    container.id = this.getId();
     const className = this.cssConfig_['container'];
     if (className) {
       dom.addClass(container, className);
@@ -251,11 +248,9 @@ export class ToolboxCategory
     const nestedPadding = `${
       ToolboxCategory.nestedPadding * this.getLevel()
     }px`;
-    if (this.workspace_.RTL) {
-      rowDiv.style.paddingRight = nestedPadding;
-    } else {
-      rowDiv.style.paddingLeft = nestedPadding;
-    }
+    this.workspace_.RTL
+      ? (rowDiv.style.paddingRight = nestedPadding)
+      : (rowDiv.style.paddingLeft = nestedPadding);
     return rowDiv;
   }
 
@@ -351,9 +346,9 @@ export class ToolboxCategory
           '" must not have both a style and a colour',
       );
     } else if (styleName) {
-      return this.getColourfromStyle(styleName);
+      return this.getColourfromStyle_(styleName);
     } else if (colour) {
-      return this.parseColour(colour);
+      return this.parseColour_(colour);
     }
     return '';
   }
@@ -365,12 +360,12 @@ export class ToolboxCategory
    * @param styleName Name of the style.
    * @returns The hex colour for the category.
    */
-  private getColourfromStyle(styleName: string): string {
+  private getColourfromStyle_(styleName: string): string {
     const theme = this.workspace_.getTheme();
     if (styleName && theme) {
       const style = theme.categoryStyles[styleName];
       if (style && style.colour) {
-        return this.parseColour(style.colour);
+        return this.parseColour_(style.colour);
       } else {
         console.warn(
           'Style "' + styleName + '" must exist and contain a colour value',
@@ -399,7 +394,7 @@ export class ToolboxCategory
    *     reference string pointing to one of those two values.
    * @returns The hex colour for the category.
    */
-  private parseColour(colourValue: number | string): string {
+  private parseColour_(colourValue: number | string): string {
     // Decode the colour for any potential message references
     // (eg. `%{BKY_MATH_HUE}`).
     const colour = parsing.replaceMessageReferences(colourValue);
@@ -545,7 +540,7 @@ export class ToolboxCategory
     }
     const className = this.cssConfig_['selected'];
     if (isSelected) {
-      const defaultColour = this.parseColour(
+      const defaultColour = this.parseColour_(
         ToolboxCategory.defaultBackgroundColour,
       );
       this.rowDiv_.style.backgroundColor = this.colour_ || defaultColour;
@@ -569,11 +564,9 @@ export class ToolboxCategory
   setDisabled(isDisabled: boolean) {
     this.isDisabled_ = isDisabled;
     this.getDiv()!.setAttribute('disabled', `${isDisabled}`);
-    if (isDisabled) {
-      this.getDiv()!.setAttribute('disabled', 'true');
-    } else {
-      this.getDiv()!.removeAttribute('disabled');
-    }
+    isDisabled
+      ? this.getDiv()!.setAttribute('disabled', 'true')
+      : this.getDiv()!.removeAttribute('disabled');
   }
 
   /**
@@ -666,19 +659,19 @@ export type CssConfig = ToolboxCategory.CssConfig;
 
 /** CSS for Toolbox.  See css.js for use. */
 Css.register(`
-.blocklyToolboxCategory:not(.blocklyToolboxSelected):hover {
+.blocklyTreeRow:not(.blocklyTreeSelected):hover {
   background-color: rgba(255, 255, 255, .2);
 }
 
-.blocklyToolbox[layout="h"] .blocklyToolboxCategoryContainer {
+.blocklyToolboxDiv[layout="h"] .blocklyToolboxCategory {
   margin: 1px 5px 1px 0;
 }
 
-.blocklyToolbox[dir="RTL"][layout="h"] .blocklyToolboxCategoryContainer {
+.blocklyToolboxDiv[dir="RTL"][layout="h"] .blocklyToolboxCategory {
   margin: 1px 0 1px 5px;
 }
 
-.blocklyToolboxCategory {
+.blocklyTreeRow {
   height: 22px;
   line-height: 22px;
   margin-bottom: 3px;
@@ -686,12 +679,12 @@ Css.register(`
   white-space: nowrap;
 }
 
-.blocklyToolbox[dir="RTL"] .blocklyToolboxCategory {
+.blocklyToolboxDiv[dir="RTL"] .blocklyTreeRow {
   margin-left: 8px;
   padding-right: 0;
 }
 
-.blocklyToolboxCategoryIcon {
+.blocklyTreeIcon {
   background-image: url(<<<PATH>>>/sprites.png);
   height: 16px;
   vertical-align: middle;
@@ -699,42 +692,42 @@ Css.register(`
   width: 16px;
 }
 
-.blocklyToolboxCategoryIconClosed {
+.blocklyTreeIconClosed {
   background-position: -32px -1px;
 }
 
-.blocklyToolbox[dir="RTL"] .blocklyToolboxCategoryIconClosed {
+.blocklyToolboxDiv[dir="RTL"] .blocklyTreeIconClosed {
   background-position: 0 -1px;
 }
 
-.blocklyToolboxSelected>.blocklyToolboxCategoryIconClosed {
+.blocklyTreeSelected>.blocklyTreeIconClosed {
   background-position: -32px -17px;
 }
 
-.blocklyToolbox[dir="RTL"] .blocklyToolboxSelected>.blocklyToolboxCategoryIconClosed {
+.blocklyToolboxDiv[dir="RTL"] .blocklyTreeSelected>.blocklyTreeIconClosed {
   background-position: 0 -17px;
 }
 
-.blocklyToolboxCategoryIconOpen {
+.blocklyTreeIconOpen {
   background-position: -16px -1px;
 }
 
-.blocklyToolboxSelected>.blocklyToolboxCategoryIconOpen {
+.blocklyTreeSelected>.blocklyTreeIconOpen {
   background-position: -16px -17px;
 }
 
-.blocklyToolboxCategoryLabel {
+.blocklyTreeLabel {
   cursor: default;
   font: 16px sans-serif;
   padding: 0 3px;
   vertical-align: middle;
 }
 
-.blocklyToolboxDelete .blocklyToolboxCategoryLabel {
+.blocklyToolboxDelete .blocklyTreeLabel {
   cursor: url("<<<PATH>>>/handdelete.cur"), auto;
 }
 
-.blocklyToolboxSelected .blocklyToolboxCategoryLabel {
+.blocklyTreeSelected .blocklyTreeLabel {
   color: #fff;
 }
 `);

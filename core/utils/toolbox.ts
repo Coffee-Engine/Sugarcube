@@ -21,9 +21,10 @@ export interface BlockInfo {
   type?: string;
   gap?: string | number;
   disabled?: string | boolean;
-  disabledReasons?: string[];
   enabled?: boolean;
   id?: string;
+  x?: number;
+  y?: number;
   collapsed?: boolean;
   inline?: boolean;
   data?: string;
@@ -283,9 +284,9 @@ function hasCategoriesInternal(toolboxJson: ToolboxInfo | null): boolean {
     return toolboxKind === CATEGORY_TOOLBOX_KIND;
   }
 
-  const categories = toolboxJson['contents'].filter(
-    (item) => item['kind'].toUpperCase() === 'CATEGORY',
-  );
+  const categories = toolboxJson['contents'].filter(function (item) {
+    return item['kind'].toUpperCase() === 'CATEGORY';
+  });
   return !!categories.length;
 }
 
@@ -380,7 +381,7 @@ function addAttributes(node: Node, obj: AnyDuringMigration) {
     // AnyDuringMigration because:  Property 'attributes' does not exist on type
     // 'Node'.
     const attr = (node as AnyDuringMigration).attributes[j];
-    if (attr.nodeName.includes('css-')) {
+    if (attr.nodeName.indexOf('css-') > -1) {
       obj['cssconfig'] = obj['cssconfig'] || {};
       obj['cssconfig'][attr.nodeName.replace('css-', '')] = attr.value;
     } else {

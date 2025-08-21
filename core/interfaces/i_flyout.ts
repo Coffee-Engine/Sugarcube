@@ -6,19 +6,17 @@
 
 // Former goog.module ID: Blockly.IFlyout
 
-import type {BlockSvg} from '../block_svg.js';
-import type {FlyoutItem} from '../flyout_item.js';
-import type {Coordinate} from '../utils/coordinate.js';
-import type {Svg} from '../utils/svg.js';
-import type {FlyoutDefinition} from '../utils/toolbox.js';
 import type {WorkspaceSvg} from '../workspace_svg.js';
-import {IFocusableTree} from './i_focusable_tree.js';
+import type {BlockSvg} from '../block_svg.js';
+import type {Coordinate} from '../utils/coordinate.js';
+import type {FlyoutDefinition} from '../utils/toolbox.js';
+import type {Svg} from '../utils/svg.js';
 import type {IRegistrable} from './i_registrable.js';
 
 /**
  * Interface for a flyout.
  */
-export interface IFlyout extends IRegistrable, IFocusableTree {
+export interface IFlyout extends IRegistrable {
   /** Whether the flyout is laid out horizontally or not. */
   horizontalLayout: boolean;
 
@@ -118,16 +116,6 @@ export interface IFlyout extends IRegistrable, IFocusableTree {
    *     of the dynamic category.
    */
   show(flyoutDef: FlyoutDefinition | string): void;
-
-  /**
-   * Returns the list of flyout items currently present in the flyout.
-   * The `show` method parses the flyout definition into a list of actual
-   * flyout items. This method should return those concrete items, which
-   * may be used for e.g. keyboard navigation.
-   *
-   * @returns List of flyout items.
-   */
-  getContents(): FlyoutItem[];
 
   /**
    * Create a copy of this block on the workspace.

@@ -23,8 +23,8 @@ import {
 } from './field.js';
 import * as fieldRegistry from './field_registry.js';
 import {Menu} from './menu.js';
-import {MenuSeparator} from './menu_separator.js';
 import {MenuItem} from './menuitem.js';
+import * as style from './utils/style.js';
 import * as aria from './utils/aria.js';
 import {Coordinate} from './utils/coordinate.js';
 import * as dom from './utils/dom.js';
@@ -36,10 +36,14 @@ import {Svg} from './utils/svg.js';
  * Class for an editable dropdown field.
  */
 export class FieldDropdown extends Field<string> {
+  /** Horizontal distance that a checkmark overhangs the dropdown. */
+  static CHECKMARK_OVERHANG = 25;
+
   /**
-   * Magic constant used to represent a separator in a list of dropdown items.
+   * Maximum height of the dropdown menu, as a percentage of the viewport
+   * height.
    */
-  static readonly SEPARATOR = 'separator';
+  static MAX_MENU_HEIGHT_VH = 0.45;
 
   static ARROW_CHAR = '▾';
 
@@ -66,6 +70,9 @@ export class FieldDropdown extends Field<string> {
    */
   override SERIALIZABLE = true;
 
+  /** Mouse cursor style when over the hotspot that initiates the editor. */
+  override CURSOR = 'default';
+
   protected menuGenerator_?: MenuGenerator;
 
   /** A cache of the most recently generated options. */
@@ -87,15 +94,6 @@ export class FieldDropdown extends Field<string> {
   // TODO(b/109816955): remove '!', see go/strict-prop-init-fix.
   private selectedOption!: MenuOption;
   override clickTarget_: SVGElement | null = null;
-
-  /**
-   * The y offset from the top of the field to the top of the image, if an image
-   * is selected.
-   */
-  protected static IMAGE_Y_OFFSET = 5;
-
-  /** The total vertical padding above and below an image. */
-  protected static IMAGE_Y_PADDING = FieldDropdown.IMAGE_Y_OFFSET * 2;
 
   /**
    * @param menuGenerator A non-empty array of options for a dropdown list, or a
@@ -129,11 +127,26 @@ export class FieldDropdown extends Field<string> {
     // If we pass SKIP_SETUP, don't do *anything* with the menu generator.
     if (menuGenerator === Field.SKIP_SETUP) return;
 
-    this.setOptions(menuGenerator);
+    if (Array.isArray(menuGenerator)) {
+      validateOptions(menuGenerator);
+      const trimmed = trimOptions(menuGenerator);
+      this.menuGenerator_ = trimmed.options;
+      this.prefixField = trimmed.prefix || null;
+      this.suffixField = trimmed.suffix || null;
+    } else {
+      this.menuGenerator_ = menuGenerator;
+    }
+
+    /**
+     * The currently selected option. The field is initialized with the
+     * first option selected.
+     */
+    this.selectedOption = this.getOptions(false)[0];
 
     if (config) {
       this.configure_(config);
     }
+    this.setValue(this.selectedOption[1]);
     if (validator) {
       this.setValidator(validator);
     }
@@ -191,11 +204,6 @@ export class FieldDropdown extends Field<string> {
     if (this.borderRect_) {
       dom.addClass(this.borderRect_, 'blocklyDropdownRect');
     }
-
-    if (this.fieldGroup_) {
-      dom.addClass(this.fieldGroup_, 'blocklyField');
-      dom.addClass(this.fieldGroup_, 'blocklyDropdownField');
-    }
   }
 
   /**
@@ -221,9 +229,6 @@ export class FieldDropdown extends Field<string> {
           : ' ' + FieldDropdown.ARROW_CHAR,
       ),
     );
-    if (this.getConstants()!.FIELD_TEXT_BASELINE_CENTER) {
-      this.arrow.setAttribute('dominant-baseline', 'central');
-    }
     if (this.getSourceBlock()?.RTL) {
       this.getTextElement().insertBefore(this.arrow, this.textContent_);
     } else {
@@ -260,45 +265,38 @@ export class FieldDropdown extends Field<string> {
       throw new UnattachedFieldError();
     }
     this.dropdownCreate();
-    if (!this.menu_) return;
-
     if (e && typeof e.clientX === 'number') {
-      this.menu_.openingCoords = new Coordinate(e.clientX, e.clientY);
+      this.menu_!.openingCoords = new Coordinate(e.clientX, e.clientY);
     } else {
-      this.menu_.openingCoords = null;
+      this.menu_!.openingCoords = null;
     }
 
     // Remove any pre-existing elements in the dropdown.
     dropDownDiv.clearContent();
     // Element gets created in render.
-    const menuElement = this.menu_.render(dropDownDiv.getContentDiv());
+    const menuElement = this.menu_!.render(dropDownDiv.getContentDiv());
     dom.addClass(menuElement, 'blocklyDropdownMenu');
-
-    //Add our color to the dropdown
-    if (this.menu_) {
-      this.menu_.getMenuItems().forEach((item) => {
-        const menuItem = item.getElement();
-        if (menuItem && this.textElement_) menuItem.children[0].setAttribute("style", `color: ${this.textElement_.style.fill}`);
-      })
-    }
 
     if (this.getConstants()!.FIELD_DROPDOWN_COLOURED_DIV) {
       const primaryColour = block.getColour();
-      const borderColour = (this.sourceBlock_ as BlockSvg).getColourTertiary();
+      const borderColour = (this.sourceBlock_ as BlockSvg).style.colourTertiary;
       dropDownDiv.setColour(primaryColour, borderColour);
     }
 
     dropDownDiv.showPositionedByField(this, this.dropdownDispose_.bind(this));
 
-    dropDownDiv.getContentDiv().style.height = `${this.menu_.getSize().height}px`;
-
     // Focusing needs to be handled after the menu is rendered and positioned.
     // Otherwise it will cause a page scroll to get the misplaced menu in
     // view. See issue #1329.
-    this.menu_.focus();
+    this.menu_!.focus();
 
     if (this.selectedMenuItem) {
-      this.menu_.setHighlighted(this.selectedMenuItem);
+      this.menu_!.setHighlighted(this.selectedMenuItem);
+      style.scrollIntoContainerView(
+        this.selectedMenuItem.getElement()!,
+        dropDownDiv.getContentDiv(),
+        true,
+      );
     }
 
     this.applyColour();
@@ -317,19 +315,13 @@ export class FieldDropdown extends Field<string> {
     const options = this.getOptions(false);
     this.selectedMenuItem = null;
     for (let i = 0; i < options.length; i++) {
-      const option = options[i];
-      if (option === FieldDropdown.SEPARATOR) {
-        menu.addChild(new MenuSeparator());
-        continue;
-      }
-
-      const [label, value] = option;
+      const [label, value] = options[i];
       const content = (() => {
-        if (isImageProperties(label)) {
+        if (typeof label === 'object') {
           // Convert ImageProperties to an HTMLImageElement.
-          const image = new Image(label.width, label.height);
-          image.src = label.src;
-          image.alt = label.alt;
+          const image = new Image(label['width'], label['height']);
+          image.src = label['src'];
+          image.alt = label['alt'] || '';
           return image;
         }
         return label;
@@ -406,30 +398,8 @@ export class FieldDropdown extends Field<string> {
     if (useCache && this.generatedOptions) return this.generatedOptions;
 
     this.generatedOptions = this.menuGenerator_();
-    this.validateOptions(this.generatedOptions);
+    validateOptions(this.generatedOptions);
     return this.generatedOptions;
-  }
-
-  /**
-   * Update the options on this dropdown. This will reset the selected item to
-   * the first item in the list.
-   *
-   * @param menuGenerator The array of options or a generator function.
-   */
-  setOptions(menuGenerator: MenuGenerator) {
-    if (Array.isArray(menuGenerator)) {
-      this.validateOptions(menuGenerator);
-      const trimmed = this.trimOptions(menuGenerator);
-      this.menuGenerator_ = trimmed.options;
-      this.prefixField = trimmed.prefix || null;
-      this.suffixField = trimmed.suffix || null;
-    } else {
-      this.menuGenerator_ = menuGenerator;
-    }
-    // The currently selected option. The field is initialized with the
-    // first option selected.
-    this.selectedOption = this.getOptions(false)[0];
-    this.setValue(this.selectedOption[1]);
   }
 
   /**
@@ -438,13 +408,7 @@ export class FieldDropdown extends Field<string> {
    * @param newValue The input value.
    * @returns A valid language-neutral option, or null if invalid.
    */
-  protected override doClassValidation_(
-    newValue: string,
-  ): string | null | undefined;
-  protected override doClassValidation_(newValue?: string): string | null;
-  protected override doClassValidation_(
-    newValue?: string,
-  ): string | null | undefined {
+  protected override doClassValidation_(newValue?: string): string | null {
     const options = this.getOptions(true);
     const isValueValid = options.some((option) => option[1] === newValue);
 
@@ -462,7 +426,7 @@ export class FieldDropdown extends Field<string> {
       }
       return null;
     }
-    return newValue;
+    return newValue as string;
   }
 
   /**
@@ -485,25 +449,23 @@ export class FieldDropdown extends Field<string> {
    * Updates the dropdown arrow to match the colour/style of the block.
    */
   override applyColour() {
-    const sourceBlock = this.sourceBlock_ as BlockSvg;
+    const style = (this.sourceBlock_ as BlockSvg).style;
     if (this.borderRect_) {
-      this.borderRect_.setAttribute('stroke', sourceBlock.getColourTertiary());
+      this.borderRect_.setAttribute('stroke', style.colourTertiary);
       if (this.menu_) {
-        this.borderRect_.setAttribute('fill', sourceBlock.getColourTertiary());
+        this.borderRect_.setAttribute('fill', style.colourTertiary);
       } else {
         this.borderRect_.setAttribute('fill', 'transparent');
       }
     }
     // Update arrow's colour.
-    if (sourceBlock && this.arrow) {
-      if (sourceBlock.isShadow()) {
-        this.arrow.style.fill = sourceBlock.getColourSecondary();
+    if (this.sourceBlock_ && this.arrow) {
+      if (this.sourceBlock_.isShadow()) {
+        this.arrow.style.fill = style.colourSecondary;
       } else {
-        this.arrow.style.fill = sourceBlock.getColour();
+        this.arrow.style.fill = style.colourPrimary;
       }
     }
-
-    super.applyColour();
   }
 
   /** Draws the border with the correct width. */
@@ -514,7 +476,7 @@ export class FieldDropdown extends Field<string> {
 
     // Show correct element.
     const option = this.selectedOption && this.selectedOption[0];
-    if (isImageProperties(option)) {
+    if (option && typeof option === 'object') {
       this.renderSelectedImage(option);
     } else {
       this.renderSelectedText();
@@ -549,7 +511,7 @@ export class FieldDropdown extends Field<string> {
     const hasBorder = !!this.borderRect_;
     const height = Math.max(
       hasBorder ? this.getConstants()!.FIELD_DROPDOWN_BORDER_RECT_HEIGHT : 0,
-      imageHeight + FieldDropdown.IMAGE_Y_PADDING,
+      imageHeight + IMAGE_Y_PADDING,
     );
     const xPadding = hasBorder
       ? this.getConstants()!.FIELD_BORDER_RECT_X_PADDING
@@ -561,7 +523,12 @@ export class FieldDropdown extends Field<string> {
         height / 2 - this.getConstants()!.FIELD_DROPDOWN_SVG_ARROW_SIZE / 2,
       );
     } else {
-      arrowWidth = dom.getTextWidth(this.arrow as SVGTSpanElement);
+      arrowWidth = dom.getFastTextWidth(
+        this.arrow as SVGTSpanElement,
+        this.getConstants()!.FIELD_TEXT_FONTSIZE,
+        this.getConstants()!.FIELD_TEXT_FONTWEIGHT,
+        this.getConstants()!.FIELD_TEXT_FONTFAMILY,
+      );
     }
     this.size_.width = imageWidth + arrowWidth + xPadding * 2;
     this.size_.height = height;
@@ -594,7 +561,12 @@ export class FieldDropdown extends Field<string> {
       hasBorder ? this.getConstants()!.FIELD_DROPDOWN_BORDER_RECT_HEIGHT : 0,
       this.getConstants()!.FIELD_TEXT_HEIGHT,
     );
-    const textWidth = dom.getTextWidth(this.getTextElement());
+    const textWidth = dom.getFastTextWidth(
+      this.getTextElement(),
+      this.getConstants()!.FIELD_TEXT_FONTSIZE,
+      this.getConstants()!.FIELD_TEXT_FONTWEIGHT,
+      this.getConstants()!.FIELD_TEXT_FONTFAMILY,
+    );
     const xPadding = hasBorder
       ? this.getConstants()!.FIELD_BORDER_RECT_X_PADDING
       : 0;
@@ -643,13 +615,7 @@ export class FieldDropdown extends Field<string> {
   /**
    * Use the `getText_` developer hook to override the field's text
    * representation.  Get the selected option text.  If the selected option is
-   * an image we return the image alt text. If the selected option is
-   * an HTMLElement, return the title, ariaLabel, or innerText of the
-   * element.
-   *
-   * If you use HTMLElement options in Node.js and call this function,
-   * ensure that you are supplying an implementation of HTMLElement,
-   * such as through jsdom-global.
+   * an image we return the image alt text.
    *
    * @returns Selected option text.
    */
@@ -658,23 +624,10 @@ export class FieldDropdown extends Field<string> {
       return null;
     }
     const option = this.selectedOption[0];
-    if (isImageProperties(option)) {
-      return option.alt;
-    } else if (
-      typeof HTMLElement !== 'undefined' &&
-      option instanceof HTMLElement
-    ) {
-      return option.title ?? option.ariaLabel ?? option.innerText;
-    } else if (typeof option === 'string') {
-      return option;
+    if (typeof option === 'object') {
+      return option['alt'];
     }
-
-    console.warn(
-      "Can't get text for existing dropdown option. If " +
-        "you're using HTMLElement dropdown options in node, ensure you're " +
-        'using jsdom-global or similar.',
-    );
-    return null;
+    return option;
   }
 
   /**
@@ -685,9 +638,7 @@ export class FieldDropdown extends Field<string> {
    * @nocollapse
    * @internal
    */
-  static override fromJson(
-    options: FieldDropdownFromJsonConfig,
-  ): FieldDropdown {
+  static fromJson(options: FieldDropdownFromJsonConfig): FieldDropdown {
     if (!options.options) {
       throw new Error(
         'options are required for the dropdown field. The ' +
@@ -699,153 +650,6 @@ export class FieldDropdown extends Field<string> {
     // override the static fromJson method.
     return new this(options.options, undefined, options);
   }
-
-  /**
-   * Factor out common words in statically defined options.
-   * Create prefix and/or suffix labels.
-   */
-  protected trimOptions(options: MenuOption[]): {
-    options: MenuOption[];
-    prefix?: string;
-    suffix?: string;
-  } {
-    let hasImages = false;
-    const trimmedOptions = options.map((option): MenuOption => {
-      if (option === FieldDropdown.SEPARATOR) return option;
-
-      const [label, value] = option;
-      if (typeof label === 'string') {
-        return [parsing.replaceMessageReferences(label), value];
-      }
-
-      hasImages = true;
-      // Copy the image properties so they're not influenced by the original.
-      // NOTE: No need to deep copy since image properties are only 1 level deep.
-      const imageLabel = isImageProperties(label)
-        ? {...label, alt: parsing.replaceMessageReferences(label.alt)}
-        : {...label};
-      return [imageLabel, value];
-    });
-
-    if (hasImages || options.length < 2) return {options: trimmedOptions};
-
-    const stringOptions = trimmedOptions as [string, string][];
-    const stringLabels = stringOptions.map(([label]) => label);
-
-    const shortest = utilsString.shortestStringLength(stringLabels);
-    const prefixLength = utilsString.commonWordPrefix(stringLabels, shortest);
-    const suffixLength = utilsString.commonWordSuffix(stringLabels, shortest);
-
-    if (
-      (!prefixLength && !suffixLength) ||
-      shortest <= prefixLength + suffixLength
-    ) {
-      // One or more strings will entirely vanish if we proceed.  Abort.
-      return {options: stringOptions};
-    }
-
-    const prefix = prefixLength
-      ? stringLabels[0].substring(0, prefixLength - 1)
-      : undefined;
-    const suffix = suffixLength
-      ? stringLabels[0].substr(1 - suffixLength)
-      : undefined;
-    return {
-      options: this.applyTrim(stringOptions, prefixLength, suffixLength),
-      prefix,
-      suffix,
-    };
-  }
-
-  /**
-   * Use the calculated prefix and suffix lengths to trim all of the options in
-   * the given array.
-   *
-   * @param options Array of option tuples:
-   *     (human-readable text or image, language-neutral name).
-   * @param prefixLength The length of the common prefix.
-   * @param suffixLength The length of the common suffix
-   * @returns A new array with all of the option text trimmed.
-   */
-  private applyTrim(
-    options: [string, string][],
-    prefixLength: number,
-    suffixLength: number,
-  ): MenuOption[] {
-    return options.map(([text, value]) => [
-      text.substring(prefixLength, text.length - suffixLength),
-      value,
-    ]);
-  }
-
-  /**
-   * Validates the data structure to be processed as an options list.
-   *
-   * @param options The proposed dropdown options.
-   * @throws {TypeError} If proposed options are incorrectly structured.
-   */
-  protected validateOptions(options: MenuOption[]) {
-    if (!Array.isArray(options)) {
-      throw TypeError('FieldDropdown options must be an array.');
-    }
-    if (!options.length) {
-      throw TypeError('FieldDropdown options must not be an empty array.');
-    }
-    let foundError = false;
-    for (let i = 0; i < options.length; i++) {
-      const option = options[i];
-      if (!Array.isArray(option) && option !== FieldDropdown.SEPARATOR) {
-        foundError = true;
-        console.error(
-          `Invalid option[${i}]: Each FieldDropdown option must be an array or
-          the string literal 'separator'. Found: ${option}`,
-        );
-      } else if (typeof option[1] !== 'string') {
-        foundError = true;
-        console.error(
-          `Invalid option[${i}]: Each FieldDropdown option id must be a string. 
-          Found ${option[1]} in: ${option}`,
-        );
-      } else if (
-        option[0] &&
-        typeof option[0] !== 'string' &&
-        !isImageProperties(option[0]) &&
-        !(
-          typeof HTMLElement !== 'undefined' && option[0] instanceof HTMLElement
-        )
-      ) {
-        foundError = true;
-        console.error(
-          `Invalid option[${i}]: Each FieldDropdown option must have a string 
-          label, image description, or HTML element. Found ${option[0]} in: ${option}`,
-        );
-      }
-    }
-    if (foundError) {
-      throw TypeError('Found invalid FieldDropdown options.');
-    }
-  }
-}
-
-/**
- * Returns whether or not an object conforms to the ImageProperties interface.
- *
- * @param obj The object to test.
- * @returns True if the object conforms to ImageProperties, otherwise false.
- */
-function isImageProperties(obj: any): obj is ImageProperties {
-  return (
-    obj &&
-    typeof obj === 'object' &&
-    'src' in obj &&
-    typeof obj.src === 'string' &&
-    'alt' in obj &&
-    typeof obj.alt === 'string' &&
-    'width' in obj &&
-    typeof obj.width === 'number' &&
-    'height' in obj &&
-    typeof obj.height === 'number'
-  );
 }
 
 /**
@@ -859,15 +663,11 @@ export interface ImageProperties {
 }
 
 /**
- * An individual option in the dropdown menu. Can be either the string literal
- * `separator` for a menu separator item, or an array for normal action menu
- * items. In the latter case, the first element is the human-readable value
- * (text, ImageProperties object, or HTML element), and the second element is
- * the language-neutral value.
+ * An individual option in the dropdown menu. The first element is the human-
+ * readable value (text or image), and the second element is the language-
+ * neutral value.
  */
-export type MenuOption =
-  | [string | ImageProperties | HTMLElement, string]
-  | 'separator';
+export type MenuOption = [string | ImageProperties, string];
 
 /**
  * A function that generates an array of menu options for FieldDropdown
@@ -909,5 +709,148 @@ export interface FieldDropdownFromJsonConfig extends FieldDropdownConfig {
  * - `undefined` to set `newValue` as is.
  */
 export type FieldDropdownValidator = FieldValidator<string>;
+
+/**
+ * The y offset from the top of the field to the top of the image, if an image
+ * is selected.
+ */
+const IMAGE_Y_OFFSET = 5;
+
+/** The total vertical padding above and below an image. */
+const IMAGE_Y_PADDING: number = IMAGE_Y_OFFSET * 2;
+
+/**
+ * Factor out common words in statically defined options.
+ * Create prefix and/or suffix labels.
+ */
+function trimOptions(options: MenuOption[]): {
+  options: MenuOption[];
+  prefix?: string;
+  suffix?: string;
+} {
+  let hasImages = false;
+  const trimmedOptions = options.map(([label, value]): MenuOption => {
+    if (typeof label === 'string') {
+      return [parsing.replaceMessageReferences(label), value];
+    }
+
+    hasImages = true;
+    // Copy the image properties so they're not influenced by the original.
+    // NOTE: No need to deep copy since image properties are only 1 level deep.
+    const imageLabel =
+      label.alt !== null
+        ? {...label, alt: parsing.replaceMessageReferences(label.alt)}
+        : {...label};
+    return [imageLabel, value];
+  });
+
+  if (hasImages || options.length < 2) return {options: trimmedOptions};
+
+  const stringOptions = trimmedOptions as [string, string][];
+  const stringLabels = stringOptions.map(([label]) => label);
+
+  const shortest = utilsString.shortestStringLength(stringLabels);
+  const prefixLength = utilsString.commonWordPrefix(stringLabels, shortest);
+  const suffixLength = utilsString.commonWordSuffix(stringLabels, shortest);
+
+  if (
+    (!prefixLength && !suffixLength) ||
+    shortest <= prefixLength + suffixLength
+  ) {
+    // One or more strings will entirely vanish if we proceed.  Abort.
+    return {options: stringOptions};
+  }
+
+  const prefix = prefixLength
+    ? stringLabels[0].substring(0, prefixLength - 1)
+    : undefined;
+  const suffix = suffixLength
+    ? stringLabels[0].substr(1 - suffixLength)
+    : undefined;
+  return {
+    options: applyTrim(stringOptions, prefixLength, suffixLength),
+    prefix,
+    suffix,
+  };
+}
+
+/**
+ * Use the calculated prefix and suffix lengths to trim all of the options in
+ * the given array.
+ *
+ * @param options Array of option tuples:
+ *     (human-readable text or image, language-neutral name).
+ * @param prefixLength The length of the common prefix.
+ * @param suffixLength The length of the common suffix
+ * @returns A new array with all of the option text trimmed.
+ */
+function applyTrim(
+  options: [string, string][],
+  prefixLength: number,
+  suffixLength: number,
+): MenuOption[] {
+  return options.map(([text, value]) => [
+    text.substring(prefixLength, text.length - suffixLength),
+    value,
+  ]);
+}
+
+/**
+ * Validates the data structure to be processed as an options list.
+ *
+ * @param options The proposed dropdown options.
+ * @throws {TypeError} If proposed options are incorrectly structured.
+ */
+function validateOptions(options: MenuOption[]) {
+  if (!Array.isArray(options)) {
+    throw TypeError('FieldDropdown options must be an array.');
+  }
+  if (!options.length) {
+    throw TypeError('FieldDropdown options must not be an empty array.');
+  }
+  let foundError = false;
+  for (let i = 0; i < options.length; i++) {
+    const tuple = options[i];
+    if (!Array.isArray(tuple)) {
+      foundError = true;
+      console.error(
+        'Invalid option[' +
+          i +
+          ']: Each FieldDropdown option must be an ' +
+          'array. Found: ',
+        tuple,
+      );
+    } else if (typeof tuple[1] !== 'string') {
+      foundError = true;
+      console.error(
+        'Invalid option[' +
+          i +
+          ']: Each FieldDropdown option id must be ' +
+          'a string. Found ' +
+          tuple[1] +
+          ' in: ',
+        tuple,
+      );
+    } else if (
+      tuple[0] &&
+      typeof tuple[0] !== 'string' &&
+      typeof tuple[0].src !== 'string'
+    ) {
+      foundError = true;
+      console.error(
+        'Invalid option[' +
+          i +
+          ']: Each FieldDropdown option must have a ' +
+          'string label or image description. Found' +
+          tuple[0] +
+          ' in: ',
+        tuple,
+      );
+    }
+  }
+  if (foundError) {
+    throw TypeError('Found invalid FieldDropdown options.');
+  }
+}
 
 fieldRegistry.register('field_dropdown', FieldDropdown);

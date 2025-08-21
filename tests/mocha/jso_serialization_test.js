@@ -5,7 +5,12 @@
  */
 
 import * as Blockly from '../../build/src/core/blockly.js';
-import {assert} from '../../node_modules/chai/chai.js';
+import {
+  createGenUidStubWithReturns,
+  sharedTestSetup,
+  sharedTestTeardown,
+  workspaceTeardown,
+} from './test_helpers/setup_teardown.js';
 import {
   defineRowBlock,
   defineStackBlock,
@@ -15,18 +20,11 @@ import {
   MockParameterModel,
   MockProcedureModel,
 } from './test_helpers/procedures.js';
-import {
-  createGenUidStubWithReturns,
-  sharedTestSetup,
-  sharedTestTeardown,
-  workspaceTeardown,
-} from './test_helpers/setup_teardown.js';
 
 suite('JSO Serialization', function () {
   setup(function () {
     sharedTestSetup.call(this);
     this.workspace = new Blockly.Workspace();
-    this.sandbox = sinon.createSandbox();
 
     defineStackBlock();
     defineRowBlock();
@@ -36,13 +34,12 @@ suite('JSO Serialization', function () {
   });
 
   teardown(function () {
-    this.sandbox.restore();
     workspaceTeardown.call(this, this.workspace);
     sharedTestTeardown.call(this);
   });
 
   function assertProperty(obj, property, value) {
-    assert.deepEqual(obj[property], value);
+    chai.assert.deepEqual(obj[property], value);
   }
 
   function assertNoProperty(obj, property) {
@@ -54,7 +51,7 @@ suite('JSO Serialization', function () {
       const block = this.workspace.newBlock('row_block');
       block.setInsertionMarker(true);
       const jso = Blockly.serialization.blocks.save(block);
-      assert.isNull(jso);
+      chai.assert.isNull(jso);
     });
 
     test('Basic', function () {
@@ -87,30 +84,19 @@ suite('JSO Serialization', function () {
         });
       });
 
-      suite('DisabledReasons', function () {
-        test('One reason', function () {
+      suite('Enabled', function () {
+        test('False', function () {
           const block = this.workspace.newBlock('row_block');
-          block.setDisabledReason(true, 'test reason');
+          block.setEnabled(false);
           const jso = Blockly.serialization.blocks.save(block);
-          assertProperty(jso, 'disabledReasons', ['test reason']);
+          assertProperty(jso, 'enabled', false);
         });
 
-        test('Zero reasons', function () {
+        test('True', function () {
           const block = this.workspace.newBlock('row_block');
-          block.setDisabledReason(false, 'test reason');
+          block.setEnabled(true);
           const jso = Blockly.serialization.blocks.save(block);
-          assertNoProperty(jso, 'disabledReasons');
-        });
-
-        test('Multiple reasons', function () {
-          const block = this.workspace.newBlock('row_block');
-          block.setDisabledReason(true, 'test reason 1');
-          block.setDisabledReason(true, 'test reason 2');
-          const jso = Blockly.serialization.blocks.save(block);
-          assertProperty(jso, 'disabledReasons', [
-            'test reason 1',
-            'test reason 2',
-          ]);
+          assertNoProperty(jso, 'enabled');
         });
       });
 
@@ -385,7 +371,7 @@ suite('JSO Serialization', function () {
     suite('Connected blocks', function () {
       setup(function () {
         this.assertInput = function (jso, name, value) {
-          assert.deepInclude(jso['inputs'][name], value);
+          chai.assert.deepInclude(jso['inputs'][name], value);
         };
 
         this.createBlockWithChild = function (blockType, inputName) {
@@ -468,7 +454,7 @@ suite('JSO Serialization', function () {
           const jso = Blockly.serialization.blocks.save(block, {
             addInputBlocks: false,
           });
-          assert.isUndefined(jso['inputs']);
+          chai.assert.isUndefined(jso['inputs']);
         };
 
         this.assertNoShadow = function (blockType, inputName) {
@@ -476,7 +462,7 @@ suite('JSO Serialization', function () {
           const jso = Blockly.serialization.blocks.save(block, {
             addInputBlocks: false,
           });
-          assert.isUndefined(jso['inputs']);
+          chai.assert.isUndefined(jso['inputs']);
         };
 
         this.assertNoOverwrittenShadow = function (blockType, inputName) {
@@ -487,7 +473,7 @@ suite('JSO Serialization', function () {
           const jso = Blockly.serialization.blocks.save(block, {
             addInputBlocks: false,
           });
-          assert.isUndefined(jso['inputs']);
+          chai.assert.isUndefined(jso['inputs']);
         };
       });
 
@@ -533,7 +519,7 @@ suite('JSO Serialization', function () {
             },
             'block': {
               'type': 'text',
-              'id': 'id4',
+              'id': 'id3',
               'fields': {
                 'TEXT': '',
               },
@@ -663,7 +649,7 @@ suite('JSO Serialization', function () {
           test('Child', function () {
             const block = this.createNextWithChild();
             const jso = Blockly.serialization.blocks.save(block);
-            assert.deepInclude(jso['next'], {
+            chai.assert.deepInclude(jso['next'], {
               'block': {'type': 'stack_block', 'id': 'id2'},
             });
           });
@@ -671,7 +657,7 @@ suite('JSO Serialization', function () {
           test('Shadow', function () {
             const block = this.createNextWithShadow();
             const jso = Blockly.serialization.blocks.save(block);
-            assert.deepInclude(jso['next'], {
+            chai.assert.deepInclude(jso['next'], {
               'shadow': {'type': 'stack_block', 'id': 'test'},
             });
           });
@@ -679,7 +665,7 @@ suite('JSO Serialization', function () {
           test('Overwritten shadow', function () {
             const block = this.createNextWithShadowAndChild();
             const jso = Blockly.serialization.blocks.save(block);
-            assert.deepInclude(jso['next'], {
+            chai.assert.deepInclude(jso['next'], {
               'block': {
                 'type': 'stack_block',
                 'id': 'id2',
@@ -700,7 +686,7 @@ suite('JSO Serialization', function () {
               .getInput('NAME')
               .connection.connect(grandChildBlock.previousConnection);
             const jso = Blockly.serialization.blocks.save(block);
-            assert.deepInclude(jso['next'], {
+            chai.assert.deepInclude(jso['next'], {
               'block': {
                 'type': 'statement_block',
                 'id': 'id2',
@@ -723,7 +709,7 @@ suite('JSO Serialization', function () {
             const jso = Blockly.serialization.blocks.save(block, {
               addNextBlocks: false,
             });
-            assert.isUndefined(jso['next']);
+            chai.assert.isUndefined(jso['next']);
           });
 
           test('Shadow', function () {
@@ -731,7 +717,7 @@ suite('JSO Serialization', function () {
             const jso = Blockly.serialization.blocks.save(block, {
               addNextBlocks: false,
             });
-            assert.isUndefined(jso['next']);
+            chai.assert.isUndefined(jso['next']);
           });
 
           test('Overwritten shadow', function () {
@@ -739,7 +725,7 @@ suite('JSO Serialization', function () {
             const jso = Blockly.serialization.blocks.save(block, {
               addNextBlocks: false,
             });
-            assert.isUndefined(jso['next']);
+            chai.assert.isUndefined(jso['next']);
           });
         });
       });
@@ -750,7 +736,7 @@ suite('JSO Serialization', function () {
         test('Single block', function () {
           const block = this.workspace.newBlock('variables_get');
           const jso = Blockly.serialization.blocks.save(block);
-          assert.deepEqual(jso['fields']['VAR'], {
+          chai.assert.deepEqual(jso['fields']['VAR'], {
             'id': 'id2',
             'name': 'item',
             'type': '',
@@ -764,11 +750,10 @@ suite('JSO Serialization', function () {
             .getInput('INPUT')
             .connection.connect(childBlock.outputConnection);
           const jso = Blockly.serialization.blocks.save(block);
-          assert.deepEqual(jso['inputs']['INPUT']['block']['fields']['VAR'], {
-            'id': 'id4',
-            'name': 'item',
-            'type': '',
-          });
+          chai.assert.deepEqual(
+            jso['inputs']['INPUT']['block']['fields']['VAR'],
+            {'id': 'id4', 'name': 'item', 'type': ''},
+          );
         });
 
         test('Next block', function () {
@@ -776,7 +761,7 @@ suite('JSO Serialization', function () {
           const childBlock = this.workspace.newBlock('variables_set');
           block.nextConnection.connect(childBlock.previousConnection);
           const jso = Blockly.serialization.blocks.save(block);
-          assert.deepEqual(jso['next']['block']['fields']['VAR'], {
+          chai.assert.deepEqual(jso['next']['block']['fields']['VAR'], {
             'id': 'id4',
             'name': 'item',
             'type': '',
@@ -790,9 +775,9 @@ suite('JSO Serialization', function () {
           const jso = Blockly.serialization.blocks.save(block, {
             doFullSerialization: false,
           });
-          assert.deepEqual(jso['fields']['VAR'], {'id': 'id2'});
-          assert.isUndefined(jso['fields']['VAR']['name']);
-          assert.isUndefined(jso['fields']['VAR']['type']);
+          chai.assert.deepEqual(jso['fields']['VAR'], {'id': 'id2'});
+          chai.assert.isUndefined(jso['fields']['VAR']['name']);
+          chai.assert.isUndefined(jso['fields']['VAR']['type']);
         });
 
         test('Input block', function () {
@@ -804,13 +789,14 @@ suite('JSO Serialization', function () {
           const jso = Blockly.serialization.blocks.save(block, {
             doFullSerialization: false,
           });
-          assert.deepEqual(jso['inputs']['INPUT']['block']['fields']['VAR'], {
-            'id': 'id4',
-          });
-          assert.isUndefined(
+          chai.assert.deepEqual(
+            jso['inputs']['INPUT']['block']['fields']['VAR'],
+            {'id': 'id4'},
+          );
+          chai.assert.isUndefined(
             jso['inputs']['INPUT']['block']['fields']['VAR']['name'],
           );
-          assert.isUndefined(
+          chai.assert.isUndefined(
             jso['inputs']['INPUT']['block']['fields']['VAR']['type'],
           );
         });
@@ -822,11 +808,15 @@ suite('JSO Serialization', function () {
           const jso = Blockly.serialization.blocks.save(block, {
             doFullSerialization: false,
           });
-          assert.deepEqual(jso['next']['block']['fields']['VAR'], {
+          chai.assert.deepEqual(jso['next']['block']['fields']['VAR'], {
             'id': 'id4',
           });
-          assert.isUndefined(jso['next']['block']['fields']['VAR']['name']);
-          assert.isUndefined(jso['next']['block']['fields']['VAR']['type']);
+          chai.assert.isUndefined(
+            jso['next']['block']['fields']['VAR']['name'],
+          );
+          chai.assert.isUndefined(
+            jso['next']['block']['fields']['VAR']['type'],
+          );
         });
       });
     });
@@ -867,200 +857,105 @@ suite('JSO Serialization', function () {
       this.serializer = null;
     });
 
-    test('save is called on the procedure model', function () {
-      const proc = new MockProcedureModel();
-      this.workspace.getProcedureMap().set('test', proc);
-      const spy = this.sandbox.spy(proc, 'saveState');
-
-      this.serializer.save(this.workspace);
-
-      assert.isTrue(
-        spy.calledOnce,
-        'Expected the saveState method to be called on the procedure model',
-      );
-    });
-
-    test('save is called on each parameter model', function () {
-      const proc = new MockProcedureModel();
-      const param1 = new MockParameterModel();
-      const param2 = new MockParameterModel();
-      proc.insertParameter(param1, 0);
-      proc.insertParameter(param2, 1);
-      this.workspace.getProcedureMap().set('test', proc);
-      const spy1 = this.sandbox.spy(param1, 'saveState');
-      const spy2 = this.sandbox.spy(param2, 'saveState');
-
-      this.serializer.save(this.workspace);
-
-      assert.isTrue(
-        spy1.calledOnce,
-        'Expected the saveState method to be called on the first parameter model',
-      );
-      assert.isTrue(
-        spy2.calledOnce,
-        'Expected the saveState method to be called on the first parameter model',
-      );
-    });
-  });
-
-  suite('Workspace comments', function () {
-    suite('IDs', function () {
-      test('IDs are saved by default', function () {
-        const comment = new Blockly.comments.WorkspaceComment(
-          this.workspace,
-          'testID',
-        );
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertProperty(json, 'id', 'testID');
+    suite('invariant properties', function () {
+      test('the state always has an id property', function () {
+        const procedureModel = new MockProcedureModel();
+        this.procedureMap.add(procedureModel);
+        const jso = this.serializer.save(this.workspace);
+        const procedure = jso[0];
+        assertProperty(procedure, 'id', procedureModel.getId());
       });
 
-      test('saving IDs can be disabled', function () {
-        const comment = new Blockly.comments.WorkspaceComment(
-          this.workspace,
-          'testID',
-        );
+      test('if the name has not been set, name is an empty string', function () {
+        const procedureModel = new MockProcedureModel();
+        this.procedureMap.add(procedureModel);
+        const jso = this.serializer.save(this.workspace);
+        const procedure = jso[0];
+        assertProperty(procedure, 'name', '');
+      });
 
-        const json = Blockly.serialization.workspaceComments.save(comment, {
-          saveIds: false,
+      test('if the name has been set, name is the string', function () {
+        const procedureModel = new MockProcedureModel().setName('testName');
+        this.procedureMap.add(procedureModel);
+        const jso = this.serializer.save(this.workspace);
+        const procedure = jso[0];
+        assertProperty(procedure, 'name', 'testName');
+      });
+    });
+
+    suite('return types', function () {
+      test('if the procedure does not return, returnTypes is null', function () {
+        const procedureModel = new MockProcedureModel();
+        this.procedureMap.add(procedureModel);
+        const jso = this.serializer.save(this.workspace);
+        const procedure = jso[0];
+        assertProperty(procedure, 'returnTypes', null);
+      });
+
+      test('if the procedure has no return type, returnTypes is an empty array', function () {
+        const procedureModel = new MockProcedureModel().setReturnTypes([]);
+        this.procedureMap.add(procedureModel);
+        const jso = this.serializer.save(this.workspace);
+        const procedure = jso[0];
+        assertProperty(procedure, 'returnTypes', []);
+      });
+
+      test('if the procedure has return types, returnTypes is the array', function () {
+        const procedureModel = new MockProcedureModel().setReturnTypes([
+          'a type',
+        ]);
+        this.procedureMap.add(procedureModel);
+        const jso = this.serializer.save(this.workspace);
+        const procedure = jso[0];
+        assertProperty(procedure, 'returnTypes', ['a type']);
+      });
+    });
+
+    suite('parameters', function () {
+      suite('invariant properties', function () {
+        test('the state always has an id property', function () {
+          const parameterModel = new MockParameterModel('testparam');
+          this.procedureMap.add(
+            new MockProcedureModel().insertParameter(parameterModel, 0),
+          );
+          const jso = this.serializer.save(this.workspace);
+          const parameter = jso[0]['parameters'][0];
+          assertProperty(parameter, 'id', parameterModel.getId());
         });
 
-        assertNoProperty(json, 'id');
-      });
-    });
-
-    suite('Coordinates', function () {
-      test('coordinates are not saved by default', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.moveTo(new Blockly.utils.Coordinate(42, 1337));
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertNoProperty(json, 'x');
-        assertNoProperty(json, 'y');
+        test('the state always has a name property', function () {
+          const parameterModel = new MockParameterModel('testparam');
+          this.procedureMap.add(
+            new MockProcedureModel().insertParameter(parameterModel, 0),
+          );
+          const jso = this.serializer.save(this.workspace);
+          const parameter = jso[0]['parameters'][0];
+          assertProperty(parameter, 'name', 'testparam');
+        });
       });
 
-      test('saving coordinates can be enabled', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.moveTo(new Blockly.utils.Coordinate(42, 1337));
-
-        const json = Blockly.serialization.workspaceComments.save(comment, {
-          addCoordinates: true,
+      suite('types', function () {
+        test('if the parameter has no type, there is no type property', function () {
+          const parameterModel = new MockParameterModel('testparam');
+          this.procedureMap.add(
+            new MockProcedureModel().insertParameter(parameterModel, 0),
+          );
+          const jso = this.serializer.save(this.workspace);
+          const parameter = jso[0]['parameters'][0];
+          assertNoProperty(parameter, 'types');
         });
 
-        assertProperty(json, 'x', 42);
-        assertProperty(json, 'y', 1337);
-      });
-    });
-
-    suite('Text', function () {
-      test('the empty string is not saved', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.setText('');
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertNoProperty(json, 'text');
-      });
-
-      test('text is saved', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.setText('test text');
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertProperty(json, 'text', 'test text');
-      });
-    });
-
-    test('size is saved', function () {
-      const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-      comment.setSize(new Blockly.utils.Size(42, 1337));
-
-      const json = Blockly.serialization.workspaceComments.save(comment);
-
-      assertProperty(json, 'width', 42);
-      assertProperty(json, 'height', 1337);
-    });
-
-    suite('Collapsed', function () {
-      test('collapsed is not saved if false', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.setCollapsed(false);
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertNoProperty(json, 'collapsed');
-      });
-
-      test('collapsed is saved if true', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.setCollapsed(true);
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertProperty(json, 'collapsed', true);
-      });
-    });
-
-    suite('Editable', function () {
-      test('editable is not saved if true', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.setEditable(true);
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertNoProperty(json, 'editable');
-      });
-
-      test('editable is saved if false', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.setEditable(false);
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertProperty(json, 'editable', false);
-      });
-    });
-
-    suite('Movable', function () {
-      test('movable is not saved if true', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.setMovable(true);
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertNoProperty(json, 'movable');
-      });
-
-      test('movable is saved if false', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.setMovable(false);
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertProperty(json, 'movable', false);
-      });
-    });
-
-    suite('Deletable', function () {
-      test('deletable is not saved if true', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.setDeletable(true);
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertNoProperty(json, 'deletable');
-      });
-
-      test('deletable is saved if false', function () {
-        const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-        comment.setDeletable(false);
-
-        const json = Blockly.serialization.workspaceComments.save(comment);
-
-        assertProperty(json, 'deletable', false);
+        test('if the parameter has types, types is an array', function () {
+          const parameterModel = new MockParameterModel('testparam').setTypes([
+            'a type',
+          ]);
+          this.procedureMap.add(
+            new MockProcedureModel().insertParameter(parameterModel, 0),
+          );
+          const jso = this.serializer.save(this.workspace);
+          const parameter = jso[0]['parameters'][0];
+          assertProperty(parameter, 'types', ['a type']);
+        });
       });
     });
   });

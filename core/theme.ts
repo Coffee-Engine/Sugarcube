@@ -193,10 +193,6 @@ export namespace Theme {
     colourPrimary: string;
     colourSecondary: string;
     colourTertiary: string;
-    colourQuaternary: string;
-    colourQuinary: string;
-
-    useBlackWhiteFields: boolean;
     hat: string;
   }
 

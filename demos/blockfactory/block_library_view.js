@@ -104,36 +104,36 @@ BlockLibraryView.prototype.updateButtons =
     // User is editing a block.
 
     if (!isInLibrary) {
-      // Block type has not been saved to the library yet.
-      // Disable the delete button.
+      // Block type has not been saved to library yet. Disable the delete button
+      // and allow user to save.
       this.saveButton.textContent = 'Save "' + blockType + '"';
+      this.saveButton.disabled = false;
       this.deleteButton.disabled = true;
     } else {
-      // A version of the block type has already been saved.
-      // Enable the delete button.
+      // Block type has already been saved. Disable the save button unless the
+      // there are unsaved changes (checked below).
       this.saveButton.textContent = 'Update "' + blockType + '"';
+      this.saveButton.disabled = true;
       this.deleteButton.disabled = false;
     }
     this.deleteButton.textContent = 'Delete "' + blockType + '"';
 
-    this.saveButton.classList.remove('button_alert', 'button_warn');
+    // If changes to block have been made and are not saved, make button
+    // green to encourage user to save the block.
     if (!savedChanges) {
-      var buttonFormatClass;
+      var buttonFormatClass = 'button_warn';
 
-      var isReserved = reservedBlockFactoryBlocks.has(blockType);
-      if (isReserved || blockType === 'block_type') {
-        // Make button red to alert user that the block type can't be saved.
+      // If block type is the default, 'block_type', make button red to alert
+      // user.
+      if (blockType === 'block_type') {
         buttonFormatClass = 'button_alert';
-      } else {
-        // Block type has not been saved to library yet or has unsaved changes.
-        // Make the button green to encourage the user to save the block.
-        buttonFormatClass = 'button_warn';
       }
       this.saveButton.classList.add(buttonFormatClass);
       this.saveButton.disabled = false;
 
     } else {
       // No changes to save.
+      this.saveButton.classList.remove('button_alert', 'button_warn');
       this.saveButton.disabled = true;
     }
 

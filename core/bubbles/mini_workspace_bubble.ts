@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {BlocklyOptions} from '../blockly_options.js';
 import {Abstract as AbstractEvent} from '../events/events_abstract.js';
-import {Options} from '../options.js';
+import type {BlocklyOptions} from '../blockly_options.js';
+import {Bubble} from './bubble.js';
 import {Coordinate} from '../utils/coordinate.js';
 import * as dom from '../utils/dom.js';
+import {Options} from '../options.js';
+import {Svg} from '../utils/svg.js';
 import type {Rect} from '../utils/rect.js';
 import {Size} from '../utils/size.js';
-import {Svg} from '../utils/svg.js';
 import type {WorkspaceSvg} from '../workspace_svg.js';
-import {Bubble} from './bubble.js';
 
 /**
  * A bubble that contains a mini-workspace which can hold arbitrary blocks.
@@ -47,7 +47,7 @@ export class MiniWorkspaceBubble extends Bubble {
   /** @internal */
   constructor(
     workspaceOptions: BlocklyOptions,
-    public readonly workspace: WorkspaceSvg,
+    protected readonly workspace: WorkspaceSvg,
     protected anchor: Coordinate,
     protected ownerRect?: Rect,
   ) {
@@ -80,7 +80,6 @@ export class MiniWorkspaceBubble extends Bubble {
       flyout?.show(options.languageTree);
     }
 
-    dom.addClass(this.svgRoot, 'blocklyMiniWorkspaceBubble');
     this.miniWorkspace.addChangeListener(this.onWorkspaceChange.bind(this));
     this.miniWorkspace
       .getFlyout()
@@ -153,11 +152,7 @@ export class MiniWorkspaceBubble extends Bubble {
    * are dealt with by resizing the workspace to show them.
    */
   private bumpBlocksIntoBounds() {
-    if (
-      this.miniWorkspace.isDragging() &&
-      !this.miniWorkspace.keyboardMoveInProgress
-    )
-      return;
+    if (this.miniWorkspace.isDragging()) return;
 
     const MARGIN = 20;
 
@@ -189,15 +184,7 @@ export class MiniWorkspaceBubble extends Bubble {
    * mini workspace.
    */
   private updateBubbleSize() {
-    if (
-      this.miniWorkspace.isDragging() &&
-      !this.miniWorkspace.keyboardMoveInProgress
-    )
-      return;
-
-    // Disable autolayout if a keyboard move is in progress to prevent the
-    // mutator bubble from jumping around.
-    this.autoLayout &&= !this.miniWorkspace.keyboardMoveInProgress;
+    if (this.miniWorkspace.isDragging()) return;
 
     const currSize = this.getSize();
     const newSize = this.calculateWorkspaceSize();

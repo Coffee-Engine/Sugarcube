@@ -4,15 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../node_modules/chai/chai.js';
-import {
-  assertEventFired,
-  createChangeListenerSpy,
-} from './test_helpers/events.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
 } from './test_helpers/setup_teardown.js';
+import {
+  assertEventFired,
+  createChangeListenerSpy,
+} from './test_helpers/events.js';
 
 suite('Clipboard', function () {
   setup(function () {
@@ -31,7 +30,7 @@ suite('Clipboard', function () {
     Blockly.clipboard.registry.register('test-paster', paster);
 
     Blockly.clipboard.paste({paster: 'test-paster'}, this.workspace);
-    assert.isTrue(paster.paste.calledOnce);
+    chai.assert.isTrue(paster.paste.calledOnce);
 
     Blockly.clipboard.registry.unregister('test-paster');
   });
@@ -61,58 +60,6 @@ suite('Clipboard', function () {
       );
     });
 
-    test('copied from a mutator pastes them into the mutator', async function () {
-      const block = Blockly.serialization.blocks.append(
-        {
-          'type': 'controls_if',
-          'id': 'blockId',
-          'extraState': {
-            'elseIfCount': 1,
-          },
-        },
-        this.workspace,
-      );
-      const mutatorIcon = block.getIcon(Blockly.icons.IconType.MUTATOR);
-      await mutatorIcon.setBubbleVisible(true);
-      const mutatorWorkspace = mutatorIcon.getWorkspace();
-      const elseIf = mutatorWorkspace.getBlocksByType('controls_if_elseif')[0];
-      assert.isDefined(elseIf);
-      assert.lengthOf(mutatorWorkspace.getAllBlocks(), 2);
-      assert.lengthOf(this.workspace.getAllBlocks(), 1);
-      const data = elseIf.toCopyData();
-      Blockly.clipboard.paste(data, mutatorWorkspace);
-      assert.lengthOf(mutatorWorkspace.getAllBlocks(), 3);
-      assert.lengthOf(this.workspace.getAllBlocks(), 1);
-    });
-
-    test('pasting into a mutator flyout pastes into the mutator workspace', async function () {
-      const block = Blockly.serialization.blocks.append(
-        {
-          'type': 'controls_if',
-          'id': 'blockId',
-          'extraState': {
-            'elseIfCount': 1,
-          },
-        },
-        this.workspace,
-      );
-      const mutatorIcon = block.getIcon(Blockly.icons.IconType.MUTATOR);
-      await mutatorIcon.setBubbleVisible(true);
-      const mutatorWorkspace = mutatorIcon.getWorkspace();
-      const mutatorFlyoutWorkspace = mutatorWorkspace
-        .getFlyout()
-        .getWorkspace();
-      const elseIf =
-        mutatorFlyoutWorkspace.getBlocksByType('controls_if_elseif')[0];
-      assert.isDefined(elseIf);
-      assert.lengthOf(mutatorWorkspace.getAllBlocks(), 2);
-      assert.lengthOf(this.workspace.getAllBlocks(), 1);
-      const data = elseIf.toCopyData();
-      Blockly.clipboard.paste(data, mutatorFlyoutWorkspace);
-      assert.lengthOf(mutatorWorkspace.getAllBlocks(), 3);
-      assert.lengthOf(this.workspace.getAllBlocks(), 1);
-    });
-
     suite('pasted blocks are placed in unambiguous locations', function () {
       test('pasted blocks are bumped to not overlap', function () {
         const block = Blockly.serialization.blocks.append(
@@ -126,7 +73,7 @@ suite('Clipboard', function () {
         const data = block.toCopyData();
 
         const newBlock = Blockly.clipboard.paste(data, this.workspace);
-        assert.deepEqual(
+        chai.assert.deepEqual(
           newBlock.getRelativeToSurfaceXY(),
           new Blockly.utils.Coordinate(66, 69),
         );
@@ -158,7 +105,7 @@ suite('Clipboard', function () {
         const data = this.workspace.getBlockById('sourceBlockId').toCopyData();
 
         const newBlock = Blockly.clipboard.paste(data, this.workspace);
-        assert.deepEqual(
+        chai.assert.deepEqual(
           newBlock.getRelativeToSurfaceXY(),
           new Blockly.utils.Coordinate(94, 125),
         );
@@ -178,9 +125,9 @@ suite('Clipboard', function () {
       const data = comment.toCopyData();
 
       const newComment = Blockly.clipboard.paste(data, this.workspace);
-      assert.deepEqual(
+      chai.assert.deepEqual(
         newComment.getRelativeToSurfaceXY(),
-        new Blockly.utils.Coordinate(40, 40),
+        new Blockly.utils.Coordinate(60, 60),
       );
     });
   });

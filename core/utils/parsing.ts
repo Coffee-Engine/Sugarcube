@@ -7,6 +7,7 @@
 // Former goog.module ID: Blockly.utils.parsing
 
 import {Msg} from '../msg.js';
+
 import * as colourUtils from './colour.js';
 
 /**

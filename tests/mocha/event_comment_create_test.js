@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../node_modules/chai/chai.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
@@ -22,9 +21,12 @@ suite('Comment Create Event', function () {
 
   suite('Serialization', function () {
     test('events round-trip through JSON', function () {
-      const comment = new Blockly.comments.WorkspaceComment(this.workspace);
-      comment.setText('test text');
-      comment.moveTo(new Blockly.utils.Coordinate(10, 10));
+      const comment = new Blockly.WorkspaceComment(
+        this.workspace,
+        'test text',
+        10,
+        10,
+      );
       const origEvent = new Blockly.Events.CommentCreate(comment);
 
       const json = origEvent.toJson();
@@ -32,7 +34,7 @@ suite('Comment Create Event', function () {
       delete origEvent.xml; // xml fails deep equals for some reason.
       delete newEvent.xml; // xml fails deep equals for some reason.
 
-      assert.deepEqual(newEvent, origEvent);
+      chai.assert.deepEqual(newEvent, origEvent);
     });
   });
 });

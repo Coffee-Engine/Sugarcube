@@ -27,10 +27,7 @@ export const TEST_ONLY = {allExtensions};
  * @throws {Error} if the extension name is empty, the extension is already
  *     registered, or extensionFn is not a function.
  */
-export function register<T extends Block>(
-  name: string,
-  initFn: (this: T) => void,
-) {
+export function register(name: string, initFn: Function) {
   if (typeof name !== 'string' || name.trim() === '') {
     throw Error('Error: Invalid extension name "' + name + '"');
   }
@@ -404,7 +401,7 @@ export function buildTooltipForDropdown(
   const blockTypesChecked: string[] = [];
 
   return function (this: Block) {
-    if (!blockTypesChecked.includes(this.type)) {
+    if (blockTypesChecked.indexOf(this.type) === -1) {
       checkDropdownOptionsInTable(this, dropdownName, lookupTable);
       blockTypesChecked.push(this.type);
     }
@@ -437,10 +434,7 @@ function checkDropdownOptionsInTable(
   }
 
   const options = dropdown.getOptions();
-  for (const option of options) {
-    if (option === FieldDropdown.SEPARATOR) continue;
-
-    const [, key] = option;
+  for (const [, key] of options) {
     if (lookupTable[key] === undefined) {
       console.warn(
         `No tooltip mapping for value ${key} of field ` +

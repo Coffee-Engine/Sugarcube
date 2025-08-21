@@ -6,20 +6,15 @@
 
 // Former goog.module ID: Blockly.WidgetDiv
 
-import * as browserEvents from './browser_events.js';
 import * as common from './common.js';
-import {Field} from './field.js';
-import {ReturnEphemeralFocus, getFocusManager} from './focus_manager.js';
 import * as dom from './utils/dom.js';
+import type {Field} from './field.js';
 import type {Rect} from './utils/rect.js';
 import type {Size} from './utils/size.js';
 import type {WorkspaceSvg} from './workspace_svg.js';
 
 /** The object currently using this container. */
 let owner: unknown = null;
-
-/** The workspace associated with the owner currently using this container. */
-let ownerWorkspace: WorkspaceSvg | null = null;
 
 /** Optional cleanup function set by whichever object uses the widget. */
 let dispose: (() => void) | null = null;
@@ -35,9 +30,6 @@ let themeClassName = '';
 
 /** The HTML container for popup overlays (e.g. editor widgets). */
 let containerDiv: HTMLDivElement | null;
-
-/** Callback to FocusManager to return ephemeral focus when the div closes. */
-let returnEphemeralFocus: ReturnEphemeralFocus | null = null;
 
 /**
  * Returns the HTML container for editor widgets.
@@ -65,24 +57,13 @@ export function testOnly_setDiv(newDiv: HTMLDivElement | null) {
  * Create the widget div and inject it onto the page.
  */
 export function createDom() {
-  const container = common.getParentContainer() || document.body;
-
-  const existingContainer = document.querySelector('div.' + containerClassName);
-  if (existingContainer) {
-    containerDiv = existingContainer as HTMLDivElement;
-  } else {
-    containerDiv = document.createElement('div');
-    containerDiv.className = containerClassName;
-    containerDiv.tabIndex = -1;
+  if (document.querySelector('.' + containerClassName)) {
+    return; // Already created.
   }
 
-  browserEvents.conditionalBind(
-    containerDiv,
-    'keydown',
-    null,
-    common.globalShortcutHandler,
-  );
-
+  containerDiv = document.createElement('div') as HTMLDivElement;
+  containerDiv.className = containerClassName;
+  const container = common.getParentContainer() || document.body;
   container.appendChild(containerDiv);
 }
 
@@ -93,20 +74,8 @@ export function createDom() {
  * @param rtl Right-to-left (true) or left-to-right (false).
  * @param newDispose Optional cleanup function to be run when the widget is
  *     closed.
- * @param workspace The workspace associated with the widget owner.
- * @param manageEphemeralFocus Whether ephemeral focus should be managed
- *     according to the widget div's lifetime. Note that if a false value is
- *     passed in here then callers should manage ephemeral focus directly
- *     otherwise focus may not properly restore when the widget closes. Defaults
- *     to true.
  */
-export function show(
-  newOwner: unknown,
-  rtl: boolean,
-  newDispose: () => void,
-  workspace?: WorkspaceSvg | null,
-  manageEphemeralFocus: boolean = true,
-) {
+export function show(newOwner: unknown, rtl: boolean, newDispose: () => void) {
   hide();
   owner = newOwner;
   dispose = newDispose;
@@ -114,24 +83,14 @@ export function show(
   if (!div) return;
   div.style.direction = rtl ? 'rtl' : 'ltr';
   div.style.display = 'block';
-  if (!workspace && newOwner instanceof Field) {
-    // For backward compatibility with plugin fields that do not provide a
-    // workspace to this function, attempt to derive it from the field.
-    workspace = (newOwner as Field).getSourceBlock()?.workspace as WorkspaceSvg;
-  }
-  ownerWorkspace = workspace ?? null;
-  const rendererWorkspace =
-    workspace ?? (common.getMainWorkspace() as WorkspaceSvg);
-  rendererClassName = rendererWorkspace.getRenderer().getClassName();
-  themeClassName = rendererWorkspace.getTheme().getClassName();
+  const mainWorkspace = common.getMainWorkspace() as WorkspaceSvg;
+  rendererClassName = mainWorkspace.getRenderer().getClassName();
+  themeClassName = mainWorkspace.getTheme().getClassName();
   if (rendererClassName) {
     dom.addClass(div, rendererClassName);
   }
   if (themeClassName) {
     dom.addClass(div, themeClassName);
-  }
-  if (manageEphemeralFocus) {
-    returnEphemeralFocus = getFocusManager().takeEphemeralFocus(div);
   }
 }
 
@@ -149,10 +108,8 @@ export function hide() {
   div.style.display = 'none';
   div.style.left = '';
   div.style.top = '';
-  if (dispose) {
-    dispose();
-    dispose = null;
-  }
+  dispose && dispose();
+  dispose = null;
   div.textContent = '';
 
   if (rendererClassName) {
@@ -164,11 +121,6 @@ export function hide() {
     themeClassName = '';
   }
   (common.getMainWorkspace() as WorkspaceSvg).markFocused();
-
-  if (returnEphemeralFocus) {
-    returnEphemeralFocus();
-    returnEphemeralFocus = null;
-  }
 }
 
 /**
@@ -191,31 +143,6 @@ export function hideIfOwner(oldOwner: unknown) {
     hide();
   }
 }
-
-/**
- * Destroy the widget and hide the div if it is being used by an object in the
- * specified workspace, or if it is used by an unknown workspace.
- *
- * @param workspace The workspace that was using this container.
- */
-export function hideIfOwnerIsInWorkspace(workspace: WorkspaceSvg) {
-  let ownerIsInWorkspace = ownerWorkspace === null;
-  // Check if the given workspace is a parent workspace of the one containing
-  // our owner.
-  let currentWorkspace: WorkspaceSvg | null = workspace;
-  while (!ownerIsInWorkspace && currentWorkspace) {
-    if (currentWorkspace === workspace) {
-      ownerIsInWorkspace = true;
-      break;
-    }
-    currentWorkspace = workspace.options.parentWorkspace;
-  }
-
-  if (ownerIsInWorkspace) {
-    hide();
-  }
-}
-
 /**
  * Set the widget div's position and height.  This function does nothing clever:
  * it will not ensure that your widget div ends up in the visible window.

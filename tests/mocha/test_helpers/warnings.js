@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../../node_modules/chai/chai.js';
-
 /**
  * Captures the strings sent to console.warn() when calling a function.
  * Copies from core.
@@ -37,9 +35,9 @@ export function assertWarnings(innerFunc, messages) {
     messages = [messages];
   }
   const warnings = captureWarnings(innerFunc);
-  assert.lengthOf(warnings, messages.length);
+  chai.assert.lengthOf(warnings, messages.length);
   messages.forEach((message, i) => {
-    assert.match(warnings[i], message);
+    chai.assert.match(warnings[i], message);
   });
 }
 

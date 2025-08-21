@@ -4,17 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as Css from '../css.js';
-import * as touch from '../touch.js';
-import {browserEvents} from '../utils.js';
+import {Bubble} from './bubble.js';
 import {Coordinate} from '../utils/coordinate.js';
+import * as Css from '../css.js';
 import * as dom from '../utils/dom.js';
-import * as drag from '../utils/drag.js';
 import {Rect} from '../utils/rect.js';
 import {Size} from '../utils/size.js';
 import {Svg} from '../utils/svg.js';
+import * as touch from '../touch.js';
 import {WorkspaceSvg} from '../workspace_svg.js';
-import {Bubble} from './bubble.js';
+import {browserEvents} from '../utils.js';
 
 /**
  * A bubble that displays editable text. It can also be resized by the user.
@@ -48,9 +47,6 @@ export class TextInputBubble extends Bubble {
   /** Functions listening for changes to the size of this bubble. */
   private sizeChangeListeners: (() => void)[] = [];
 
-  /** Functions listening for changes to the location of this bubble. */
-  private locationChangeListeners: (() => void)[] = [];
-
   /** The text of this bubble. */
   private text = '';
 
@@ -66,8 +62,6 @@ export class TextInputBubble extends Bubble {
     20 + Bubble.DOUBLE_BORDER,
   );
 
-  private editable = true;
-
   /**
    * @param workspace The workspace this bubble belongs to.
    * @param anchor The anchor location of the thing this bubble is attached to.
@@ -76,15 +70,15 @@ export class TextInputBubble extends Bubble {
    *     when automatically positioning.
    */
   constructor(
-    public readonly workspace: WorkspaceSvg,
+    protected readonly workspace: WorkspaceSvg,
     protected anchor: Coordinate,
     protected ownerRect?: Rect,
   ) {
-    super(workspace, anchor, ownerRect, TextInputBubble.createTextArea());
-    dom.addClass(this.svgRoot, 'blocklyTextInputBubble');
-    this.textArea = this.getFocusableElement() as HTMLTextAreaElement;
-    this.inputRoot = this.createEditor(this.contentContainer, this.textArea);
-    this.resizeGroup = this.createResizeHandle(this.svgRoot, workspace);
+    super(workspace, anchor, ownerRect);
+    ({inputRoot: this.inputRoot, textArea: this.textArea} = this.createEditor(
+      this.contentContainer,
+    ));
+    this.resizeGroup = this.createResizeHandle(this.svgRoot);
     this.setSize(this.DEFAULT_SIZE, true);
   }
 
@@ -100,21 +94,6 @@ export class TextInputBubble extends Bubble {
     this.onTextChange();
   }
 
-  /** Sets whether or not the text in the bubble is editable. */
-  setEditable(editable: boolean) {
-    this.editable = editable;
-    if (this.editable) {
-      this.textArea.removeAttribute('readonly');
-    } else {
-      this.textArea.setAttribute('readonly', '');
-    }
-  }
-
-  /** Returns whether or not the text in the bubble is editable. */
-  isEditable(): boolean {
-    return this.editable;
-  }
-
   /** Adds a change listener to be notified when this bubble's text changes. */
   addTextChangeListener(listener: () => void) {
     this.textChangeListeners.push(listener);
@@ -125,26 +104,11 @@ export class TextInputBubble extends Bubble {
     this.sizeChangeListeners.push(listener);
   }
 
-  /** Adds a change listener to be notified when this bubble's location changes. */
-  addLocationChangeListener(listener: () => void) {
-    this.locationChangeListeners.push(listener);
-  }
-
-  /** Creates and returns the editable text area for this bubble's editor. */
-  private static createTextArea(): HTMLTextAreaElement {
-    const textArea = document.createElementNS(
-      dom.HTML_NS,
-      'textarea',
-    ) as HTMLTextAreaElement;
-    textArea.className = 'blocklyTextarea blocklyText';
-    return textArea;
-  }
-
-  /** Creates and returns the UI container element for this bubble's editor. */
-  private createEditor(
-    container: SVGGElement,
-    textArea: HTMLTextAreaElement,
-  ): SVGForeignObjectElement {
+  /** Creates the editor UI for this bubble. */
+  private createEditor(container: SVGGElement): {
+    inputRoot: SVGForeignObjectElement;
+    textArea: HTMLTextAreaElement;
+  } {
     const inputRoot = dom.createSvgElement(
       Svg.FOREIGNOBJECT,
       {
@@ -158,52 +122,87 @@ export class TextInputBubble extends Bubble {
     body.setAttribute('xmlns', dom.HTML_NS);
     body.className = 'blocklyMinimalBody';
 
+    const textArea = document.createElementNS(
+      dom.HTML_NS,
+      'textarea',
+    ) as HTMLTextAreaElement;
+    textArea.className = 'blocklyCommentTextarea';
     textArea.setAttribute('dir', this.workspace.RTL ? 'RTL' : 'LTR');
+
     body.appendChild(textArea);
     inputRoot.appendChild(body);
 
     this.bindTextAreaEvents(textArea);
+    setTimeout(() => {
+      textArea.focus();
+    }, 0);
 
-    return inputRoot;
+    return {inputRoot, textArea};
   }
 
   /** Binds events to the text area element. */
   private bindTextAreaEvents(textArea: HTMLTextAreaElement) {
-    // Don't zoom with mousewheel; let it scroll instead.
+    // Don't zoom with mousewheel.
     browserEvents.conditionalBind(textArea, 'wheel', this, (e: Event) => {
       e.stopPropagation();
     });
-    // Don't let the pointerdown event get to the workspace.
-    browserEvents.conditionalBind(textArea, 'pointerdown', this, (e: Event) => {
-      e.stopPropagation();
-      touch.clearTouchIdentifier();
-    });
 
+    browserEvents.conditionalBind(
+      textArea,
+      'focus',
+      this,
+      this.onStartEdit,
+      true,
+    );
     browserEvents.conditionalBind(textArea, 'change', this, this.onTextChange);
   }
 
   /** Creates the resize handler elements and binds events to them. */
-  private createResizeHandle(
-    container: SVGGElement,
-    workspace: WorkspaceSvg,
-  ): SVGGElement {
-    const resizeHandle = dom.createSvgElement(
-      Svg.IMAGE,
+  private createResizeHandle(container: SVGGElement): SVGGElement {
+    const resizeGroup = dom.createSvgElement(
+      Svg.G,
       {
-        'class': 'blocklyResizeHandle',
-        'href': `${workspace.options.pathToMedia}resize-handle.svg`,
+        'class': this.workspace.RTL ? 'blocklyResizeSW' : 'blocklyResizeSE',
       },
       container,
     );
+    const size = 2 * Bubble.BORDER_WIDTH;
+    dom.createSvgElement(
+      Svg.POLYGON,
+      {'points': `0,${size} ${size},${size} ${size},0`},
+      resizeGroup,
+    );
+    dom.createSvgElement(
+      Svg.LINE,
+      {
+        'class': 'blocklyResizeLine',
+        'x1': size / 3,
+        'y1': size - 1,
+        'x2': size - 1,
+        'y2': size / 3,
+      },
+      resizeGroup,
+    );
+    dom.createSvgElement(
+      Svg.LINE,
+      {
+        'class': 'blocklyResizeLine',
+        'x1': (size * 2) / 3,
+        'y1': size - 1,
+        'x2': size - 1,
+        'y2': (size * 2) / 3,
+      },
+      resizeGroup,
+    );
 
     browserEvents.conditionalBind(
-      resizeHandle,
+      resizeGroup,
       'pointerdown',
       this,
       this.onResizePointerDown,
     );
 
-    return resizeHandle;
+    return resizeGroup;
   }
 
   /**
@@ -222,12 +221,19 @@ export class TextInputBubble extends Bubble {
     const heightMinusBorder = size.height - Bubble.DOUBLE_BORDER;
     this.inputRoot.setAttribute('width', `${widthMinusBorder}`);
     this.inputRoot.setAttribute('height', `${heightMinusBorder}`);
+    this.textArea.style.width = `${widthMinusBorder - 4}px`;
+    this.textArea.style.height = `${heightMinusBorder - 4}px`;
 
-    this.resizeGroup.setAttribute('y', `${heightMinusBorder}`);
     if (this.workspace.RTL) {
-      this.resizeGroup.setAttribute('x', `${-Bubble.DOUBLE_BORDER}`);
+      this.resizeGroup.setAttribute(
+        'transform',
+        `translate(${Bubble.DOUBLE_BORDER}, ${heightMinusBorder}) scale(-1 1)`,
+      );
     } else {
-      this.resizeGroup.setAttribute('x', `${widthMinusBorder}`);
+      this.resizeGroup.setAttribute(
+        'transform',
+        `translate(${widthMinusBorder}, ${heightMinusBorder})`,
+      );
     }
 
     super.setSize(size, relayout);
@@ -236,23 +242,8 @@ export class TextInputBubble extends Bubble {
 
   /** @returns the size of this bubble. */
   getSize(): Size {
-    // Overridden to be public.
+    // Overriden to be public.
     return super.getSize();
-  }
-
-  override moveDuringDrag(newLoc: Coordinate) {
-    super.moveDuringDrag(newLoc);
-    this.onLocationChange();
-  }
-
-  override setPositionRelativeToAnchor(left: number, top: number) {
-    super.setPositionRelativeToAnchor(left, top);
-    this.onLocationChange();
-  }
-
-  protected override positionByRect(rect = new Rect(0, 0, 0, 0)) {
-    super.positionByRect(rect);
-    this.onLocationChange();
   }
 
   /** Handles mouse down events on the resize target. */
@@ -263,8 +254,7 @@ export class TextInputBubble extends Bubble {
       return;
     }
 
-    drag.start(
-      this.workspace,
+    this.workspace.startDrag(
       e,
       new Coordinate(
         this.workspace.RTL ? -this.getSize().width : this.getSize().width,
@@ -304,12 +294,23 @@ export class TextInputBubble extends Bubble {
 
   /** Handles pointer move events on the resize target. */
   private onResizePointerMove(e: PointerEvent) {
-    const delta = drag.move(this.workspace, e);
+    const delta = this.workspace.moveDrag(e);
     this.setSize(
       new Size(this.workspace.RTL ? -delta.x : delta.x, delta.y),
       false,
     );
     this.onSizeChange();
+  }
+
+  /**
+   * Handles starting an edit of the text area. Brings the bubble to the front.
+   */
+  private onStartEdit() {
+    if (this.bringToFront()) {
+      // Since the act of moving this node within the DOM causes a loss of
+      // focus, we need to reapply the focus.
+      this.textArea.focus();
+    }
   }
 
   /** Handles a text change event for the text area. Calls event listeners. */
@@ -326,25 +327,17 @@ export class TextInputBubble extends Bubble {
       listener();
     }
   }
-
-  /** Handles a location change event for the text area. Calls event listeners. */
-  private onLocationChange() {
-    for (const listener of this.locationChangeListeners) {
-      listener();
-    }
-  }
 }
 
 Css.register(`
-.blocklyTextInputBubble .blocklyTextarea {
-  background-color: var(--commentFillColour);
+.blocklyCommentTextarea {
+  background-color: #fef49c;
   border: 0;
-  box-sizing: border-box;
   display: block;
+  margin: 0;
   outline: 0;
-  padding: 5px;
+  padding: 3px;
   resize: none;
-  width: 100%;
-  height: 100%;
+  text-overflow: hidden;
 }
 `);

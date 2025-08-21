@@ -13,6 +13,7 @@ import type {BlockStyle} from '../../theme.js';
 import {Coordinate} from '../../utils/coordinate.js';
 import * as dom from '../../utils/dom.js';
 import {Svg} from '../../utils/svg.js';
+
 import type {ConstantProvider} from './constants.js';
 import type {IPathObject} from './i_path_object.js';
 
@@ -23,6 +24,18 @@ import type {IPathObject} from './i_path_object.js';
 export class PathObject implements IPathObject {
   svgRoot: SVGElement;
   svgPath: SVGElement;
+
+  /**
+   * Holds the cursors svg element when the cursor is attached to the block.
+   * This is null if there is no cursor on the block.
+   */
+  cursorSvg: SVGElement | null = null;
+
+  /**
+   * Holds the markers svg element when the marker is attached to the block.
+   * This is null if there is no marker on the block.
+   */
+  markerSvg: SVGElement | null = null;
 
   constants: ConstantProvider;
   style: BlockStyle;
@@ -53,8 +66,6 @@ export class PathObject implements IPathObject {
       {'class': 'blocklyPath'},
       this.svgRoot,
     );
-
-    this.setClass_('blocklyBlock', true);
   }
 
   /**
@@ -72,6 +83,42 @@ export class PathObject implements IPathObject {
   flipRTL() {
     // Mirror the block's path.
     this.svgPath.setAttribute('transform', 'scale(-1 1)');
+  }
+
+  /**
+   * Add the cursor SVG to this block's SVG group.
+   *
+   * @param cursorSvg The SVG root of the cursor to be added to the block SVG
+   *     group.
+   */
+  setCursorSvg(cursorSvg: SVGElement) {
+    if (!cursorSvg) {
+      this.cursorSvg = null;
+      return;
+    }
+
+    this.svgRoot.appendChild(cursorSvg);
+    this.cursorSvg = cursorSvg;
+  }
+
+  /**
+   * Add the marker SVG to this block's SVG group.
+   *
+   * @param markerSvg The SVG root of the marker to be added to the block SVG
+   *     group.
+   */
+  setMarkerSvg(markerSvg: SVGElement) {
+    if (!markerSvg) {
+      this.markerSvg = null;
+      return;
+    }
+
+    if (this.cursorSvg) {
+      this.svgRoot.insertBefore(markerSvg, this.cursorSvg);
+    } else {
+      this.svgRoot.appendChild(markerSvg);
+    }
+    this.markerSvg = markerSvg;
   }
 
   /**
@@ -121,12 +168,14 @@ export class PathObject implements IPathObject {
    *
    * @param enable True if highlighted.
    */
-
   updateHighlighted(enable: boolean) {
     if (enable) {
-      this.setClass_('blocklyHighlighted', true);
+      this.svgPath.setAttribute(
+        'filter',
+        'url(#' + this.constants.embossFilterId + ')',
+      );
     } else {
-      this.setClass_('blocklyHighlighted', false);
+      this.svgPath.setAttribute('filter', 'none');
     }
   }
 
@@ -137,11 +186,8 @@ export class PathObject implements IPathObject {
    */
   protected updateShadow_(shadow: boolean) {
     if (shadow) {
-      this.setClass_('blocklyShadow', true);
       this.svgPath.setAttribute('stroke', 'none');
       this.svgPath.setAttribute('fill', this.style.colourSecondary);
-    } else {
-      this.setClass_('blocklyShadow', false);
     }
   }
 
@@ -152,7 +198,12 @@ export class PathObject implements IPathObject {
    */
   protected updateDisabled_(disabled: boolean) {
     this.setClass_('blocklyDisabled', disabled);
-    this.setClass_('blocklyDisabledPattern', disabled);
+    if (disabled) {
+      this.svgPath.setAttribute(
+        'fill',
+        'url(#' + this.constants.disabledPatternId + ')',
+      );
+    }
   }
 
   /**
@@ -220,32 +271,37 @@ export class PathObject implements IPathObject {
     connectionPath: string,
     offset: Coordinate,
     rtl: boolean,
-  ): SVGElement {
-    const transformation =
-      `translate(${offset.x}, ${offset.y})` + (rtl ? ' scale(-1 1)' : '');
-
-    const previousHighlight = this.connectionHighlights.get(connection);
-    if (previousHighlight) {
-      // Since a connection already exists, make sure that its path and
-      // transform are correct.
-      previousHighlight.setAttribute('d', connectionPath);
-      previousHighlight.setAttribute('transform', transformation);
-      return previousHighlight;
+  ) {
+    if (this.connectionHighlights.has(connection)) {
+      if (this.currentHighlightMatchesNew(connection, connectionPath, offset)) {
+        return;
+      }
+      this.removeConnectionHighlight(connection);
     }
 
     const highlight = dom.createSvgElement(
       Svg.PATH,
       {
-        'id': connection.id,
         'class': 'blocklyHighlightedConnectionPath',
-        'style': 'display: none;',
         'd': connectionPath,
-        'transform': transformation,
+        'transform':
+          `translate(${offset.x}, ${offset.y})` + (rtl ? ' scale(-1 1)' : ''),
       },
       this.svgRoot,
     );
     this.connectionHighlights.set(connection, highlight);
-    return highlight;
+  }
+
+  private currentHighlightMatchesNew(
+    connection: RenderedConnection,
+    newPath: string,
+    newOffset: Coordinate,
+  ): boolean {
+    const currPath = this.connectionHighlights
+      .get(connection)
+      ?.getAttribute('d');
+    const currOffset = this.highlightOffsets.get(connection);
+    return currPath === newPath && Coordinate.equals(currOffset, newOffset);
   }
 
   /**

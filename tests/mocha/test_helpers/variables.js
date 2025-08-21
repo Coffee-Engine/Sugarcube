@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../../node_modules/chai/chai.js';
-
 /**
  * Check if a variable with the given values exists.
  * @param {Blockly.Workspace|Blockly.VariableMap} container The workspace  or
@@ -16,8 +14,8 @@ import {assert} from '../../../node_modules/chai/chai.js';
  */
 export function assertVariableValues(container, name, type, id) {
   const variable = container.getVariableById(id);
-  assert.isDefined(variable);
-  assert.equal(variable.name, name);
-  assert.equal(variable.type, type);
-  assert.equal(variable.getId(), id);
+  chai.assert.isDefined(variable);
+  chai.assert.equal(variable.name, name);
+  chai.assert.equal(variable.type, type);
+  chai.assert.equal(variable.getId(), id);
 }

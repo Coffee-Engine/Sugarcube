@@ -11,16 +11,18 @@
  */
 // Former goog.module ID: Blockly.Events.CommentBase
 
-import type {WorkspaceComment} from '../comments/workspace_comment.js';
-import * as comments from '../serialization/workspace_comments.js';
-import type {Workspace} from '../workspace.js';
+import * as utilsXml from '../utils/xml.js';
+import type {WorkspaceComment} from '../workspace_comment.js';
+import * as Xml from '../xml.js';
+
 import {
   Abstract as AbstractEvent,
   AbstractEventJson,
 } from './events_abstract.js';
 import type {CommentCreate} from './events_comment_create.js';
 import type {CommentDelete} from './events_comment_delete.js';
-import {getGroup, getRecordUndo} from './utils.js';
+import * as eventUtils from './utils.js';
+import type {Workspace} from '../workspace.js';
 
 /**
  * Abstract class for a comment event.
@@ -44,8 +46,8 @@ export class CommentBase extends AbstractEvent {
 
     this.commentId = opt_comment.id;
     this.workspaceId = opt_comment.workspace.id;
-    this.group = getGroup();
-    this.recordUndo = getRecordUndo();
+    this.group = eventUtils.getGroup();
+    this.recordUndo = eventUtils.getRecordUndo();
   }
 
   /**
@@ -100,10 +102,12 @@ export class CommentBase extends AbstractEvent {
   ) {
     const workspace = event.getEventWorkspace_();
     if (create) {
-      if (!event.json) {
-        throw new Error('Encountered a comment event without proper json');
+      const xmlElement = utilsXml.createElement('xml');
+      if (!event.xml) {
+        throw new Error('Ecountered a comment event without proper xml');
       }
-      comments.append(event.json, workspace);
+      xmlElement.appendChild(event.xml);
+      Xml.domToWorkspace(xmlElement, workspace);
     } else {
       if (!event.commentId) {
         throw new Error(
@@ -115,7 +119,8 @@ export class CommentBase extends AbstractEvent {
       if (comment) {
         comment.dispose();
       } else {
-        console.warn("Can't delete non-existent comment: " + event.commentId);
+        // Only complain about root-level block.
+        console.warn("Can't uncreate non-existent comment: " + event.commentId);
       }
     }
   }

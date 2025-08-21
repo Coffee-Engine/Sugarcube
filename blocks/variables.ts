@@ -6,21 +6,22 @@
 
 // Former goog.module ID: Blockly.libraryBlocks.variables
 
-import type {Block} from '../core/block.js';
-import {
-  createBlockDefinitionsFromJsonArray,
-  defineBlocks,
-} from '../core/common.js';
 import * as ContextMenu from '../core/contextmenu.js';
+import * as Extensions from '../core/extensions.js';
+import * as Variables from '../core/variables.js';
+import type {Block} from '../core/block.js';
 import type {
   ContextMenuOption,
   LegacyContextMenuOption,
 } from '../core/contextmenu_registry.js';
-import * as Extensions from '../core/extensions.js';
-import '../core/field_label.js';
 import {FieldVariable} from '../core/field_variable.js';
 import {Msg} from '../core/msg.js';
-import * as Variables from '../core/variables.js';
+import type {WorkspaceSvg} from '../core/workspace_svg.js';
+import {
+  createBlockDefinitionsFromJsonArray,
+  defineBlocks,
+} from '../core/common.js';
+import '../core/field_label.js';
 
 /**
  * A dictionary of the block definitions provided by this module.
@@ -164,11 +165,11 @@ const deleteOptionCallbackFactory = function (
   block: VariableBlock,
 ): () => void {
   return function () {
+    const workspace = block.workspace;
     const variableField = block.getField('VAR') as FieldVariable;
-    const variable = variableField.getVariable();
-    if (variable) {
-      Variables.deleteVariable(variable.getWorkspace(), variable, block);
-    }
+    const variable = variableField.getVariable()!;
+    workspace.deleteVariableById(variable.getId());
+    (workspace as WorkspaceSvg).refreshToolboxSelection();
   };
 };
 

@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../node_modules/chai/chai.js';
-import {defineMutatorBlocks} from './test_helpers/block_definitions.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
 } from './test_helpers/setup_teardown.js';
+import {defineMutatorBlocks} from './test_helpers/block_definitions.js';
 
 suite('Block Change Event', function () {
   setup(function () {
@@ -46,7 +45,7 @@ suite('Block Change Event', function () {
             '<mutation hasInput="true"/>',
           );
           blockChange.run(false);
-          assert.isFalse(block.hasInput);
+          chai.assert.isFalse(block.hasInput);
         });
 
         test('Redo', function () {
@@ -59,7 +58,7 @@ suite('Block Change Event', function () {
             '<mutation hasInput="true"/>',
           );
           blockChange.run(true);
-          assert.isTrue(block.hasInput);
+          chai.assert.isTrue(block.hasInput);
         });
       });
 
@@ -75,7 +74,7 @@ suite('Block Change Event', function () {
             '{"hasInput":true}',
           );
           blockChange.run(false);
-          assert.isFalse(block.hasInput);
+          chai.assert.isFalse(block.hasInput);
         });
 
         test('Redo', function () {
@@ -88,7 +87,7 @@ suite('Block Change Event', function () {
             '{"hasInput":true}',
           );
           blockChange.run(true);
-          assert.isTrue(block.hasInput);
+          chai.assert.isTrue(block.hasInput);
         });
       });
     });
@@ -120,7 +119,7 @@ suite('Block Change Event', function () {
       const json = origEvent.toJson();
       const newEvent = new Blockly.Events.fromJson(json, this.workspace);
 
-      assert.deepEqual(newEvent, origEvent);
+      chai.assert.deepEqual(newEvent, origEvent);
     });
   });
 });

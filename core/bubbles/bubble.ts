@@ -5,17 +5,11 @@
  */
 
 import * as browserEvents from '../browser_events.js';
-import * as common from '../common.js';
-import {BubbleDragStrategy} from '../dragging/bubble_drag_strategy.js';
-import {getFocusManager} from '../focus_manager.js';
 import {IBubble} from '../interfaces/i_bubble.js';
-import type {IFocusableTree} from '../interfaces/i_focusable_tree.js';
-import {ISelectable} from '../interfaces/i_selectable.js';
 import {ContainerRegion} from '../metrics_manager.js';
 import {Scrollbar} from '../scrollbar.js';
 import {Coordinate} from '../utils/coordinate.js';
 import * as dom from '../utils/dom.js';
-import * as idGenerator from '../utils/idgenerator.js';
 import * as math from '../utils/math.js';
 import {Rect} from '../utils/rect.js';
 import {Size} from '../utils/size.js';
@@ -27,7 +21,7 @@ import {WorkspaceSvg} from '../workspace_svg.js';
  * bubble, where it has a "tail" that points to the block, and a "head" that
  * displays arbitrary svg elements.
  */
-export abstract class Bubble implements IBubble, ISelectable {
+export abstract class Bubble implements IBubble {
   /** The width of the border around the bubble. */
   static readonly BORDER_WIDTH = 6;
 
@@ -54,8 +48,6 @@ export abstract class Bubble implements IBubble, ISelectable {
 
   /** Distance between arrow point and anchor point. */
   static readonly ANCHOR_RADIUS = 8;
-
-  public id: string;
 
   /** The SVG group containing all parts of the bubble. */
   protected svgRoot: SVGGElement;
@@ -86,43 +78,29 @@ export abstract class Bubble implements IBubble, ISelectable {
   /** The position of the left of the bubble realtive to its anchor. */
   private relativeLeft = 0;
 
-  private dragStrategy = new BubbleDragStrategy(this, this.workspace);
-
-  private focusableElement: SVGElement | HTMLElement;
-
   /**
    * @param workspace The workspace this bubble belongs to.
    * @param anchor The anchor location of the thing this bubble is attached to.
    *     The tail of the bubble will point to this location.
    * @param ownerRect An optional rect we don't want the bubble to overlap with
    *     when automatically positioning.
-   * @param overriddenFocusableElement An optional replacement to the focusable
-   *     element that's represented by this bubble (as a focusable node). This
-   *     element will have its ID overwritten. If not provided, the focusable
-   *     element of this node will default to the bubble's SVG root.
    */
   constructor(
-    public readonly workspace: WorkspaceSvg,
+    protected readonly workspace: WorkspaceSvg,
     protected anchor: Coordinate,
     protected ownerRect?: Rect,
-    overriddenFocusableElement?: SVGElement | HTMLElement,
   ) {
-    this.id = idGenerator.getNextUniqueId();
-    this.svgRoot = dom.createSvgElement(
-      Svg.G,
-      {'class': 'blocklyBubble'},
-      workspace.getBubbleCanvas(),
-    );
+    this.svgRoot = dom.createSvgElement(Svg.G, {}, workspace.getBubbleCanvas());
     const embossGroup = dom.createSvgElement(
       Svg.G,
-      {'class': 'blocklyEmboss'},
+      {
+        'filter': `url(#${
+          this.workspace.getRenderer().getConstants().embossFilterId
+        })`,
+      },
       this.svgRoot,
     );
-    this.tail = dom.createSvgElement(
-      Svg.PATH,
-      {'class': 'blocklyBubbleTail'},
-      embossGroup,
-    );
+    this.tail = dom.createSvgElement(Svg.PATH, {}, embossGroup);
     this.background = dom.createSvgElement(
       Svg.RECT,
       {
@@ -135,9 +113,6 @@ export abstract class Bubble implements IBubble, ISelectable {
       embossGroup,
     );
     this.contentContainer = dom.createSvgElement(Svg.G, {}, this.svgRoot);
-
-    this.focusableElement = overriddenFocusableElement ?? this.svgRoot;
-    this.focusableElement.setAttribute('id', this.id);
 
     browserEvents.conditionalBind(
       this.background,
@@ -220,13 +195,9 @@ export abstract class Bubble implements IBubble, ISelectable {
     this.background.setAttribute('fill', colour);
   }
 
-  /**
-   * Passes the pointer event off to the gesture system and ensures the bubble
-   * is focused.
-   */
+  /** Passes the pointer event off to the gesture system. */
   private onMouseDown(e: PointerEvent) {
     this.workspace.getGesture(e)?.handleBubbleStart(e, this);
-    getFocusManager().focusNode(this);
   }
 
   /** Positions the bubble relative to its anchor. Does not render its tail. */
@@ -632,66 +603,5 @@ export abstract class Bubble implements IBubble, ISelectable {
   /** @internal */
   showContextMenu(_e: Event) {
     // NOOP in base class.
-  }
-
-  /** Returns whether this bubble is movable or not. */
-  isMovable(): boolean {
-    return true;
-  }
-
-  /** Starts a drag on the bubble. */
-  startDrag(): void {
-    this.dragStrategy.startDrag();
-  }
-
-  /** Drags the bubble to the given location. */
-  drag(newLoc: Coordinate): void {
-    this.dragStrategy.drag(newLoc);
-  }
-
-  /** Ends the drag on the bubble. */
-  endDrag(): void {
-    this.dragStrategy.endDrag();
-  }
-
-  /** Moves the bubble back to where it was at the start of a drag. */
-  revertDrag(): void {
-    this.dragStrategy.revertDrag();
-  }
-
-  select(): void {
-    // Bubbles don't have any visual for being selected.
-    common.fireSelectedEvent(this);
-  }
-
-  unselect(): void {
-    // Bubbles don't have any visual for being selected.
-    common.fireSelectedEvent(null);
-  }
-
-  /** See IFocusableNode.getFocusableElement. */
-  getFocusableElement(): HTMLElement | SVGElement {
-    return this.focusableElement;
-  }
-
-  /** See IFocusableNode.getFocusableTree. */
-  getFocusableTree(): IFocusableTree {
-    return this.workspace;
-  }
-
-  /** See IFocusableNode.onNodeFocus. */
-  onNodeFocus(): void {
-    this.select();
-    this.bringToFront();
-  }
-
-  /** See IFocusableNode.onNodeBlur. */
-  onNodeBlur(): void {
-    this.unselect();
-  }
-
-  /** See IFocusableNode.canBeFocused. */
-  canBeFocused(): boolean {
-    return true;
   }
 }

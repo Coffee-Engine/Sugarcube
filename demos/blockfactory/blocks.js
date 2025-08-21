@@ -85,8 +85,8 @@ Blockly.Blocks['factory_base'] = {
     var type = this.workspace.newBlock('type_null');
     type.setShadow(true);
     type.outputConnection.connect(this.getInput(outputType).connection);
+    type.initSvg();
     if (this.rendered) {
-      type.initSvg();
       type.render();
     }
   },
@@ -682,7 +682,7 @@ Blockly.Blocks['type_group'] = {
     // Disconnect any children that don't belong.
     for (var i = 0; i < this.typeCount_; i++) {
       var connection = this.getInput('TYPE' + i).connection.targetConnection;
-      if (connection && !connections.includes(connection)) {
+      if (connection && connections.indexOf(connection) === -1) {
         connection.disconnect();
       }
     }
@@ -880,7 +880,7 @@ function fieldNameCheck(referenceBlock) {
   var blocks = referenceBlock.workspace.getAllBlocks(false);
   for (var i = 0, block; block = blocks[i]; i++) {
     var otherName = block.getFieldValue('FIELDNAME');
-    if (block.isEnabled() && !block.getInheritedDisabled() &&
+    if (!block.disabled && !block.getInheritedDisabled() &&
         otherName && otherName.toLowerCase() === name) {
       count++;
     }
@@ -905,7 +905,7 @@ function inputNameCheck(referenceBlock) {
   var blocks = referenceBlock.workspace.getAllBlocks(false);
   for (var i = 0, block; block = blocks[i]; i++) {
     var otherName = block.getFieldValue('INPUTNAME');
-    if (block.isEnabled() && !block.getInheritedDisabled() &&
+    if (!block.disabled && !block.getInheritedDisabled() &&
         otherName && otherName.toLowerCase() === name) {
       count++;
     }
@@ -914,7 +914,3 @@ function inputNameCheck(referenceBlock) {
       'There are ' + count + ' input blocks\n with this name.' : null;
   referenceBlock.setWarningText(msg);
 }
-
-// Make a set of all of block types that are required for the block factory.
-var reservedBlockFactoryBlocks =
-    new Set(Object.getOwnPropertyNames(Blockly.Blocks));

@@ -109,9 +109,9 @@ BlockLibraryController.prototype.clearBlockLibrary = function() {
 BlockLibraryController.prototype.saveToBlockLibrary = function() {
   var blockType = this.getCurrentBlockType();
   // If user has not changed the name of the starter block.
-  if (reservedBlockFactoryBlocks.has(blockType) || blockType === 'block_type') {
+  if (blockType === 'block_type') {
     // Do not save block if it has the default type, 'block_type'.
-    var msg = `You cannot save a block under the name "${blockType}". Try ` +
+    var msg = 'You cannot save a block under the name "block_type". Try ' +
         'changing the name before saving. Then, click on the "Block Library"' +
         ' button to view your saved blocks.';
     alert(msg);
@@ -172,29 +172,6 @@ BlockLibraryController.prototype.populateBlockLibrary = function() {
 BlockLibraryController.prototype.getBlockLibrary = function() {
   return this.storage.getBlockXmlTextMap();
 };
-
-/**
- * @return {Object[]} Array of JSON data, where each item is the data for one block type.
- */
-BlockLibraryController.prototype.getBlockLibraryAsJson = function() {
-  const xmlBlocks = this.storage.getBlockXmlMap(this.storage.getBlockTypes());
-  const jsonBlocks = [];
-  const headlessWorkspace = new Blockly.Workspace();
-
-  for (const blockName in xmlBlocks) {
-    // Load the block XML into a workspace so we can save it as JSON
-    headlessWorkspace.clear();
-    const blockXml = xmlBlocks[blockName];
-    Blockly.Xml.domToWorkspace(blockXml, headlessWorkspace);
-    const block = headlessWorkspace.getBlocksByType('factory_base', false)[0];
-
-    if (!block) continue;
-
-    const json = Blockly.serialization.blocks.save(block, {addCoordinates: false, saveIds: false});
-    jsonBlocks.push(json);
-  }
-  return jsonBlocks;
-}
 
 /**
  * Return stored XML of a given block type.

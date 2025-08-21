@@ -6,21 +6,20 @@
 
 // Former goog.module ID: Blockly.Events.VarRename
 
-import type {
-  IVariableModel,
-  IVariableState,
-} from '../interfaces/i_variable_model.js';
 import * as registry from '../registry.js';
+import type {VariableModel} from '../variable_model.js';
 
-import type {Workspace} from '../workspace.js';
 import {VarBase, VarBaseJson} from './events_var_base.js';
-import {EventType} from './type.js';
+import * as eventUtils from './utils.js';
+import type {Workspace} from '../workspace.js';
 
 /**
  * Notifies listeners that a variable model was renamed.
+ *
+ * @class
  */
 export class VarRename extends VarBase {
-  override type = EventType.VAR_RENAME;
+  override type = eventUtils.VAR_RENAME;
 
   /** The previous name of the variable. */
   oldName?: string;
@@ -32,13 +31,13 @@ export class VarRename extends VarBase {
    * @param opt_variable The renamed variable. Undefined for a blank event.
    * @param newName The new name the variable will be changed to.
    */
-  constructor(opt_variable?: IVariableModel<IVariableState>, newName?: string) {
+  constructor(opt_variable?: VariableModel, newName?: string) {
     super(opt_variable);
 
     if (!opt_variable) {
       return; // Blank event to be populated by fromJson.
     }
-    this.oldName = opt_variable.getName();
+    this.oldName = opt_variable.name;
     this.newName = typeof newName === 'undefined' ? '' : newName;
   }
 
@@ -115,12 +114,10 @@ export class VarRename extends VarBase {
           'the constructor, or call fromJson',
       );
     }
-    const variableMap = workspace.getVariableMap();
-    const variable = variableMap.getVariableById(this.varId);
     if (forward) {
-      if (variable) variableMap.renameVariable(variable, this.newName);
+      workspace.renameVariableById(this.varId, this.newName);
     } else {
-      if (variable) variableMap.renameVariable(variable, this.oldName);
+      workspace.renameVariableById(this.varId, this.oldName);
     }
   }
 }
@@ -130,4 +127,4 @@ export interface VarRenameJson extends VarBaseJson {
   newName: string;
 }
 
-registry.register(registry.Type.EVENT, EventType.VAR_RENAME, VarRename);
+registry.register(registry.Type.EVENT, eventUtils.VAR_RENAME, VarRename);

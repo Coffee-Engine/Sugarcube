@@ -4,21 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {getFocusManager} from './focus_manager.js';
-import type {IFocusableNode} from './interfaces/i_focusable_node.js';
+import {WorkspaceSvg} from './workspace_svg.js';
+import * as dom from './utils/dom.js';
+import {Svg} from './utils/svg.js';
 import {IRenderedElement} from './interfaces/i_rendered_element.js';
 import * as layerNums from './layers.js';
 import {Coordinate} from './utils/coordinate.js';
-import * as dom from './utils/dom.js';
-import {Svg} from './utils/svg.js';
-import {WorkspaceSvg} from './workspace_svg.js';
 
 /** @internal */
 export class LayerManager {
   /** The layer elements being dragged are appended to. */
   private dragLayer: SVGGElement | undefined;
-  /** The layer elements being animated are appended to. */
-  private animationLayer: SVGGElement | undefined;
   /** The layers elements not being dragged are appended to.  */
   private layers = new Map<number, SVGGElement>();
 
@@ -30,7 +26,6 @@ export class LayerManager {
     // been appended yet.
     if (injectionDiv) {
       this.dragLayer = this.createDragLayer(injectionDiv);
-      this.animationLayer = this.createAnimationLayer(injectionDiv);
     }
 
     // We construct these manually so we can add the css class for backwards
@@ -53,35 +48,6 @@ export class LayerManager {
     return dom.createSvgElement(Svg.G, {}, svg);
   }
 
-  private createAnimationLayer(injectionDiv: Element) {
-    const svg = dom.createSvgElement(Svg.SVG, {
-      'class': 'blocklyAnimationLayer',
-      'xmlns': dom.SVG_NS,
-      'xmlns:html': dom.HTML_NS,
-      'xmlns:xlink': dom.XLINK_NS,
-      'version': '1.1',
-    });
-    injectionDiv.append(svg);
-    return dom.createSvgElement(Svg.G, {}, svg);
-  }
-
-  /**
-   * Appends the element to the animation layer. The animation layer doesn't
-   * move when the workspace moves, so e.g. delete animations don't move
-   * when a block delete triggers a workspace resize.
-   *
-   * @internal
-   */
-  appendToAnimationLayer(elem: IRenderedElement) {
-    const currentTransform = this.dragLayer?.getAttribute('transform');
-    // Only update the current transform when appending, so animations don't
-    // move if the workspace moves.
-    if (currentTransform) {
-      this.animationLayer?.setAttribute('transform', currentTransform);
-    }
-    this.animationLayer?.appendChild(elem.getSvgRoot());
-  }
-
   /**
    * Translates layers when the workspace is dragged or zoomed.
    *
@@ -101,14 +67,8 @@ export class LayerManager {
    *
    * @internal
    */
-  moveToDragLayer(elem: IRenderedElement & IFocusableNode) {
+  moveToDragLayer(elem: IRenderedElement) {
     this.dragLayer?.appendChild(elem.getSvgRoot());
-
-    if (elem.canBeFocused()) {
-      // Since moving the element to the drag layer will cause it to lose focus,
-      // ensure it regains focus (to ensure proper highlights & sent events).
-      getFocusManager().focusNode(elem);
-    }
   }
 
   /**
@@ -116,14 +76,8 @@ export class LayerManager {
    *
    * @internal
    */
-  moveOffDragLayer(elem: IRenderedElement & IFocusableNode, layerNum: number) {
+  moveOffDragLayer(elem: IRenderedElement, layerNum: number) {
     this.append(elem, layerNum);
-
-    if (elem.canBeFocused()) {
-      // Since moving the element off the drag layer will cause it to lose focus,
-      // ensure it regains focus (to ensure proper highlights & sent events).
-      getFocusManager().focusNode(elem);
-    }
   }
 
   /**
@@ -136,12 +90,7 @@ export class LayerManager {
     if (!this.layers.has(layerNum)) {
       this.createLayer(layerNum);
     }
-    const childElem = elem.getSvgRoot();
-    if (this.layers.get(layerNum)?.lastChild !== childElem) {
-      // Only append the child if it isn't already last (to avoid re-firing
-      // events like focused).
-      this.layers.get(layerNum)?.appendChild(childElem);
-    }
+    this.layers.get(layerNum)?.appendChild(elem.getSvgRoot());
   }
 
   /**

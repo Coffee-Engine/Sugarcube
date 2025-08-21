@@ -10,11 +10,11 @@
 
 // Former goog.module ID: Blockly.Lua.loops
 
-import type {ControlFlowInLoopBlock} from '../../blocks/loops.js';
-import type {Block} from '../../core/block.js';
-import {NameType} from '../../core/names.js';
 import * as stringUtils from '../../core/utils/string.js';
+import type {Block} from '../../core/block.js';
+import type {ControlFlowInLoopBlock} from '../../blocks/loops.js';
 import type {LuaGenerator} from './lua_generator.js';
+import {NameType} from '../../core/names.js';
 import {Order} from './lua_generator.js';
 
 /**
@@ -35,7 +35,7 @@ const CONTINUE_STATEMENT = 'goto continue\n';
  * @returns Generated label or '' if unnecessary
  */
 function addContinueLabel(branch: string, indent: string): string {
-  if (branch.includes(CONTINUE_STATEMENT)) {
+  if (branch.indexOf(CONTINUE_STATEMENT) !== -1) {
     // False positives are possible (e.g. a string literal), but are harmless.
     return branch + indent + '::continue::\n';
   } else {

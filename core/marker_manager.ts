@@ -11,7 +11,7 @@
  */
 // Former goog.module ID: Blockly.MarkerManager
 
-import {LineCursor} from './keyboard_nav/line_cursor.js';
+import type {Cursor} from './keyboard_nav/cursor.js';
 import type {Marker} from './keyboard_nav/marker.js';
 import type {WorkspaceSvg} from './workspace_svg.js';
 
@@ -23,18 +23,22 @@ export class MarkerManager {
   static readonly LOCAL_MARKER = 'local_marker_1';
 
   /** The cursor. */
-  private cursor: LineCursor;
+  private cursor_: Cursor | null = null;
+
+  /** The cursor's SVG element. */
+  private cursorSvg_: SVGElement | null = null;
 
   /** The map of markers for the workspace. */
   private markers = new Map<string, Marker>();
+
+  /** The marker's SVG element. */
+  private markerSvg_: SVGElement | null = null;
 
   /**
    * @param workspace The workspace for the marker manager.
    * @internal
    */
-  constructor(private readonly workspace: WorkspaceSvg) {
-    this.cursor = new LineCursor(this.workspace);
-  }
+  constructor(private readonly workspace: WorkspaceSvg) {}
 
   /**
    * Register the marker by adding it to the map of markers.
@@ -46,6 +50,10 @@ export class MarkerManager {
     if (this.markers.has(id)) {
       this.unregisterMarker(id);
     }
+    marker.setDrawer(
+      this.workspace.getRenderer().makeMarkerDrawer(this.workspace, marker),
+    );
+    this.setMarkerSvg(marker.getDrawer().createDom());
     this.markers.set(id, marker);
   }
 
@@ -74,8 +82,8 @@ export class MarkerManager {
    *
    * @returns The cursor for this workspace.
    */
-  getCursor(): LineCursor {
-    return this.cursor;
+  getCursor(): Cursor | null {
+    return this.cursor_;
   }
 
   /**
@@ -95,8 +103,70 @@ export class MarkerManager {
    *
    * @param cursor The cursor used to move around this workspace.
    */
-  setCursor(cursor: LineCursor) {
-    this.cursor = cursor;
+  setCursor(cursor: Cursor) {
+    if (this.cursor_ && this.cursor_.getDrawer()) {
+      this.cursor_.getDrawer().dispose();
+    }
+    this.cursor_ = cursor;
+    if (this.cursor_) {
+      const drawer = this.workspace
+        .getRenderer()
+        .makeMarkerDrawer(this.workspace, this.cursor_);
+      this.cursor_.setDrawer(drawer);
+      this.setCursorSvg(this.cursor_.getDrawer().createDom());
+    }
+  }
+
+  /**
+   * Add the cursor SVG to this workspace SVG group.
+   *
+   * @param cursorSvg The SVG root of the cursor to be added to the workspace
+   *     SVG group.
+   * @internal
+   */
+  setCursorSvg(cursorSvg: SVGElement | null) {
+    if (!cursorSvg) {
+      this.cursorSvg_ = null;
+      return;
+    }
+
+    this.workspace.getBlockCanvas()!.appendChild(cursorSvg);
+    this.cursorSvg_ = cursorSvg;
+  }
+
+  /**
+   * Add the marker SVG to this workspaces SVG group.
+   *
+   * @param markerSvg The SVG root of the marker to be added to the workspace
+   *     SVG group.
+   * @internal
+   */
+  setMarkerSvg(markerSvg: SVGElement | null) {
+    if (!markerSvg) {
+      this.markerSvg_ = null;
+      return;
+    }
+
+    if (this.workspace.getBlockCanvas()) {
+      if (this.cursorSvg_) {
+        this.workspace
+          .getBlockCanvas()!
+          .insertBefore(markerSvg, this.cursorSvg_);
+      } else {
+        this.workspace.getBlockCanvas()!.appendChild(markerSvg);
+      }
+    }
+  }
+
+  /**
+   * Redraw the attached cursor SVG if needed.
+   *
+   * @internal
+   */
+  updateMarkers() {
+    if (this.workspace.keyboardAccessibilityMode && this.cursorSvg_) {
+      this.workspace.getCursor()!.draw();
+    }
   }
 
   /**
@@ -111,6 +181,9 @@ export class MarkerManager {
       this.unregisterMarker(markerId);
     }
     this.markers.clear();
-    this.cursor.dispose();
+    if (this.cursor_) {
+      this.cursor_.dispose();
+      this.cursor_ = null;
+    }
   }
 }

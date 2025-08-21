@@ -12,6 +12,7 @@ import * as colour from '../../utils/colour.js';
 import * as dom from '../../utils/dom.js';
 import {Svg} from '../../utils/svg.js';
 import {PathObject as BasePathObject} from '../common/path_object.js';
+
 import type {ConstantProvider} from './constants.js';
 
 /**
@@ -102,10 +103,14 @@ export class PathObject extends BasePathObject {
   }
 
   override updateHighlighted(highlighted: boolean) {
-    super.updateHighlighted(highlighted);
     if (highlighted) {
+      this.svgPath.setAttribute(
+        'filter',
+        'url(#' + this.constants.embossFilterId + ')',
+      );
       this.svgPathLight.style.display = 'none';
     } else {
+      this.svgPath.setAttribute('filter', 'none');
       this.svgPathLight.style.display = 'inline';
     }
   }

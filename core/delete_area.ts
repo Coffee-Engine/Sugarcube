@@ -14,7 +14,6 @@
 
 import {BlockSvg} from './block_svg.js';
 import {DragTarget} from './drag_target.js';
-import {isDeletable} from './interfaces/i_deletable.js';
 import type {IDeleteArea} from './interfaces/i_delete_area.js';
 import type {IDraggable} from './interfaces/i_draggable.js';
 
@@ -52,16 +51,17 @@ export class DeleteArea extends DragTarget implements IDeleteArea {
    * before onDragEnter/onDragOver/onDragExit.
    *
    * @param element The block or bubble currently being dragged.
+   * @param couldConnect Whether the element could could connect to another.
    * @returns Whether the element provided would be deleted if dropped on this
    *     area.
    */
-  wouldDelete(element: IDraggable): boolean {
+  wouldDelete(element: IDraggable, couldConnect: boolean): boolean {
     if (element instanceof BlockSvg) {
       const block = element;
       const couldDeleteBlock = !block.getParent() && block.isDeletable();
-      this.updateWouldDelete_(couldDeleteBlock);
+      this.updateWouldDelete_(couldDeleteBlock && !couldConnect);
     } else {
-      this.updateWouldDelete_(isDeletable(element) && element.isDeletable());
+      this.updateWouldDelete_(element.isDeletable());
     }
     return this.wouldDelete_;
   }

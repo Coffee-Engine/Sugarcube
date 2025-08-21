@@ -8,8 +8,6 @@
 
 import type {BlockSvg} from './block_svg.js';
 import * as clipboard from './clipboard.js';
-import {RenderedWorkspaceComment} from './comments/rendered_workspace_comment.js';
-import {MANUALLY_DISABLED} from './constants.js';
 import {
   ContextMenuRegistry,
   RegistryItem,
@@ -18,11 +16,9 @@ import {
 import * as dialog from './dialog.js';
 import * as Events from './events/events.js';
 import * as eventUtils from './events/utils.js';
-import {getFocusManager} from './focus_manager.js';
 import {CommentIcon} from './icons/comment_icon.js';
 import {Msg} from './msg.js';
 import {StatementInput} from './renderers/zelos/zelos.js';
-import {Coordinate} from './utils/coordinate.js';
 import type {WorkspaceSvg} from './workspace_svg.js';
 
 /**
@@ -459,9 +455,9 @@ export function registerCollapseExpandBlock() {
 export function registerDisable() {
   const disableOption: RegistryItem = {
     displayText(scope: Scope) {
-      return scope.block!.hasDisabledReason(MANUALLY_DISABLED)
-        ? Msg['ENABLE_BLOCK']
-        : Msg['DISABLE_BLOCK'];
+      return scope.block!.isEnabled()
+        ? Msg['DISABLE_BLOCK']
+        : Msg['ENABLE_BLOCK'];
     },
     preconditionFn(scope: Scope) {
       const block = scope.block;
@@ -470,14 +466,7 @@ export function registerDisable() {
         block!.workspace.options.disable &&
         block!.isEditable()
       ) {
-        // Determine whether this block is currently disabled for any reason
-        // other than the manual reason that this context menu item controls.
-        const disabledReasons = block!.getDisabledReasons();
-        const isDisabledForOtherReason =
-          disabledReasons.size >
-          (disabledReasons.has(MANUALLY_DISABLED) ? 1 : 0);
-
-        if (block!.getInheritedDisabled() || isDisabledForOtherReason) {
+        if (block!.getInheritedDisabled()) {
           return 'disabled';
         }
         return 'enabled';
@@ -490,10 +479,7 @@ export function registerDisable() {
       if (!existingGroup) {
         eventUtils.setGroup(true);
       }
-      block!.setDisabledReason(
-        !block!.hasDisabledReason(MANUALLY_DISABLED),
-        MANUALLY_DISABLED,
-      );
+      block!.setEnabled(!block!.isEnabled());
       eventUtils.setGroup(existingGroup);
     },
     scopeType: ContextMenuRegistry.ScopeType.BLOCK,
@@ -568,113 +554,6 @@ export function registerHelp() {
   ContextMenuRegistry.registry.register(helpOption);
 }
 
-/** Registers an option for deleting a workspace comment. */
-export function registerCommentDelete() {
-  const deleteOption: RegistryItem = {
-    displayText: () => Msg['REMOVE_COMMENT'],
-    preconditionFn(scope: Scope) {
-      return scope.comment?.isDeletable() ? 'enabled' : 'hidden';
-    },
-    callback(scope: Scope) {
-      eventUtils.setGroup(true);
-      scope.comment?.dispose();
-      eventUtils.setGroup(false);
-    },
-    scopeType: ContextMenuRegistry.ScopeType.COMMENT,
-    id: 'commentDelete',
-    weight: 6,
-  };
-  ContextMenuRegistry.registry.register(deleteOption);
-}
-
-/** Registers an option for duplicating a workspace comment. */
-export function registerCommentDuplicate() {
-  const duplicateOption: RegistryItem = {
-    displayText: () => Msg['DUPLICATE_COMMENT'],
-    preconditionFn(scope: Scope) {
-      return scope.comment?.isMovable() ? 'enabled' : 'hidden';
-    },
-    callback(scope: Scope) {
-      if (!scope.comment) return;
-      const data = scope.comment.toCopyData();
-      if (!data) return;
-      clipboard.paste(data, scope.comment.workspace);
-    },
-    scopeType: ContextMenuRegistry.ScopeType.COMMENT,
-    id: 'commentDuplicate',
-    weight: 1,
-  };
-  ContextMenuRegistry.registry.register(duplicateOption);
-}
-
-/** Registers an option for adding a workspace comment to the workspace. */
-export function registerCommentCreate() {
-  const createOption: RegistryItem = {
-    displayText: () => Msg['ADD_COMMENT'],
-    preconditionFn: (scope: Scope) => {
-      return scope.workspace?.isMutator ? 'hidden' : 'enabled';
-    },
-    callback: (
-      scope: Scope,
-      menuOpenEvent: Event,
-      menuSelectEvent: Event,
-      location: Coordinate,
-    ) => {
-      const workspace = scope.workspace;
-      if (!workspace) return;
-      eventUtils.setGroup(true);
-      const comment = new RenderedWorkspaceComment(workspace);
-      comment.setPlaceholderText(Msg['WORKSPACE_COMMENT_DEFAULT_TEXT']);
-      comment.moveTo(
-        pixelsToWorkspaceCoords(
-          new Coordinate(location.x, location.y),
-          workspace,
-        ),
-      );
-      getFocusManager().focusNode(comment);
-      eventUtils.setGroup(false);
-    },
-    scopeType: ContextMenuRegistry.ScopeType.WORKSPACE,
-    id: 'commentCreate',
-    weight: 8,
-  };
-  ContextMenuRegistry.registry.register(createOption);
-}
-
-/**
- * Converts pixel coordinates (relative to the window) to workspace coordinates.
- */
-function pixelsToWorkspaceCoords(
-  pixelCoord: Coordinate,
-  workspace: WorkspaceSvg,
-): Coordinate {
-  const injectionDiv = workspace.getInjectionDiv();
-  // Bounding rect coordinates are in client coordinates, meaning that they
-  // are in pixels relative to the upper left corner of the visible browser
-  // window.  These coordinates change when you scroll the browser window.
-  const boundingRect = injectionDiv.getBoundingClientRect();
-
-  // The client coordinates offset by the injection div's upper left corner.
-  const clientOffsetPixels = new Coordinate(
-    pixelCoord.x - boundingRect.left,
-    pixelCoord.y - boundingRect.top,
-  );
-
-  // The offset in pixels between the main workspace's origin and the upper
-  // left corner of the injection div.
-  const mainOffsetPixels = workspace.getOriginOffsetInPixels();
-
-  // The position of the new comment in pixels relative to the origin of the
-  // main workspace.
-  const finalOffset = Coordinate.difference(
-    clientOffsetPixels,
-    mainOffsetPixels,
-  );
-  // The position of the new comment in main workspace coordinates.
-  finalOffset.scale(1 / workspace.scale);
-  return finalOffset;
-}
-
 /** Registers all block-scoped context menu items. */
 function registerBlockOptions_() {
   registerDuplicate();
@@ -684,13 +563,6 @@ function registerBlockOptions_() {
   registerDisable();
   registerDelete();
   registerHelp();
-}
-
-/** Registers all workspace comment related menu items. */
-export function registerCommentOptions() {
-  registerCommentDuplicate();
-  registerCommentDelete();
-  registerCommentCreate();
 }
 
 /**

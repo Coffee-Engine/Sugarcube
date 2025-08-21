@@ -6,7 +6,6 @@
 
 import {ConnectionType} from '../../../build/src/core/connection_type.js';
 import {VariableModel} from '../../../build/src/core/variable_model.js';
-import {assert} from '../../../node_modules/chai/chai.js';
 
 /**
  * Asserts that the procedure definition or call block has the expected var
@@ -20,7 +19,7 @@ function assertBlockVarModels(block, varIds) {
   for (let i = 0; i < varIds.length; i++) {
     expectedVarModels.push(block.workspace.getVariableById(varIds[i]));
   }
-  assert.sameDeepOrderedMembers(block.getVarModels(), expectedVarModels);
+  chai.assert.sameDeepOrderedMembers(block.getVarModels(), expectedVarModels);
 }
 
 /**
@@ -30,7 +29,7 @@ function assertBlockVarModels(block, varIds) {
  */
 function assertCallBlockArgsStructure(callBlock, args) {
   // inputList also contains "TOPROW"
-  assert.equal(
+  chai.assert.equal(
     callBlock.inputList.length - 1,
     args.length,
     'call block has the expected number of args',
@@ -39,15 +38,15 @@ function assertCallBlockArgsStructure(callBlock, args) {
   for (let i = 0; i < args.length; i++) {
     const expectedName = args[i];
     const callInput = callBlock.inputList[i + 1];
-    assert.equal(callInput.type, ConnectionType.INPUT_VALUE);
-    assert.equal(callInput.name, 'ARG' + i);
-    assert.equal(
+    chai.assert.equal(callInput.type, ConnectionType.INPUT_VALUE);
+    chai.assert.equal(callInput.name, 'ARG' + i);
+    chai.assert.equal(
       callInput.fieldRow[0].getValue(),
       expectedName,
       'Call block consts did not match expected.',
     );
   }
-  assert.sameOrderedMembers(callBlock.getVars(), args);
+  chai.assert.sameOrderedMembers(callBlock.getVars(), args);
 }
 
 /**
@@ -69,42 +68,42 @@ export function assertDefBlockStructure(
   hasStatements = true,
 ) {
   if (hasStatements) {
-    assert.isNotNull(
+    chai.assert.isNotNull(
       defBlock.getInput('STACK'),
       'Def block should have STACK input',
     );
   } else {
-    assert.isNull(
+    chai.assert.isNull(
       defBlock.getInput('STACK'),
       'Def block should not have STACK input',
     );
   }
   if (hasReturn) {
-    assert.isNotNull(
+    chai.assert.isNotNull(
       defBlock.getInput('RETURN'),
       'Def block should have RETURN input',
     );
   } else {
-    assert.isNull(
+    chai.assert.isNull(
       defBlock.getInput('RETURN'),
       'Def block should not have RETURN input',
     );
   }
   if (args.length) {
-    assert.include(
+    chai.assert.include(
       defBlock.toString(),
       'with',
       'Def block string should include "with"',
     );
   } else {
-    assert.notInclude(
+    chai.assert.notInclude(
       defBlock.toString(),
       'with',
       'Def block string should not include "with"',
     );
   }
 
-  assert.sameOrderedMembers(defBlock.getVars(), args);
+  chai.assert.sameOrderedMembers(defBlock.getVars(), args);
   assertBlockVarModels(defBlock, varIds);
 }
 
@@ -123,15 +122,15 @@ export function assertCallBlockStructure(
   name = undefined,
 ) {
   if (args.length) {
-    assert.include(callBlock.toString(), 'with');
+    chai.assert.include(callBlock.toString(), 'with');
   } else {
-    assert.notInclude(callBlock.toString(), 'with');
+    chai.assert.notInclude(callBlock.toString(), 'with');
   }
 
   assertCallBlockArgsStructure(callBlock, args);
   assertBlockVarModels(callBlock, varIds);
   if (name !== undefined) {
-    assert.equal(callBlock.getFieldValue('NAME'), name);
+    chai.assert.equal(callBlock.getFieldValue('NAME'), name);
   }
 }
 
@@ -188,14 +187,6 @@ export class MockProcedureModel {
     this.parameters = [];
     this.returnTypes = null;
     this.enabled = true;
-  }
-
-  static loadState(state, workspace) {
-    return new MockProcedureModel();
-  }
-
-  saveState() {
-    return {};
   }
 
   setName(name) {
@@ -257,14 +248,6 @@ export class MockParameterModel {
     this.id = Blockly.utils.idGenerator.genUid();
     this.name = name;
     this.types = [];
-  }
-
-  static loadState(state, workspace) {
-    return new MockParameterModel('test');
-  }
-
-  saveState() {
-    return {};
   }
 
   setName(name) {

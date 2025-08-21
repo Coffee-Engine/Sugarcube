@@ -8,22 +8,20 @@
 
 import type {Block} from '../block.js';
 import type {BlockSvg} from '../block_svg.js';
-import {TextInputBubble} from '../bubbles/textinput_bubble.js';
-import {EventType} from '../events/type.js';
-import * as eventUtils from '../events/utils.js';
-import type {IBubble} from '../interfaces/i_bubble.js';
-import type {IHasBubble} from '../interfaces/i_has_bubble.js';
-import type {ISerializable} from '../interfaces/i_serializable.js';
-import * as renderManagement from '../render_management.js';
+import {IconType} from './icon_types.js';
 import {Coordinate} from '../utils.js';
 import * as dom from '../utils/dom.js';
+import * as eventUtils from '../events/utils.js';
+import {Icon} from './icon.js';
+import type {IHasBubble} from '../interfaces/i_has_bubble.js';
+import type {ISerializable} from '../interfaces/i_serializable.js';
 import {Rect} from '../utils/rect.js';
+import * as registry from './registry.js';
 import {Size} from '../utils/size.js';
 import {Svg} from '../utils/svg.js';
+import {TextBubble} from '../bubbles/text_bubble.js';
+import {TextInputBubble} from '../bubbles/textinput_bubble.js';
 import type {WorkspaceSvg} from '../workspace_svg.js';
-import {Icon} from './icon.js';
-import {IconType} from './icon_types.js';
-import * as registry from './registry.js';
 
 /** The size of the comment icon in workspace-scale units. */
 const SIZE = 17;
@@ -47,17 +45,17 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
    */
   static readonly WEIGHT = 3;
 
-  /** The bubble used to show comment text to the user. */
+  /** The bubble used to show editable text to the user. */
   private textInputBubble: TextInputBubble | null = null;
+
+  /** The bubble used to show non-editable text to the user. */
+  private textBubble: TextBubble | null = null;
 
   /** The text of this comment. */
   private text = '';
 
   /** The size of this comment (which is applied to the editable bubble). */
   private bubbleSize = new Size(DEFAULT_BUBBLE_WIDTH, DEFAULT_BUBBLE_HEIGHT);
-
-  /** The location of the comment bubble in workspace coordinates. */
-  private bubbleLocation?: Coordinate;
 
   /**
    * The visibility of the bubble for this comment.
@@ -112,12 +110,13 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
       },
       this.svgRoot,
     );
-    dom.addClass(this.svgRoot!, 'blocklyCommentIcon');
+    dom.addClass(this.svgRoot!, 'blockly-icon-comment');
   }
 
   override dispose() {
     super.dispose();
     this.textInputBubble?.dispose();
+    this.textBubble?.dispose();
   }
 
   override getWeight(): number {
@@ -130,40 +129,36 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
 
   override applyColour(): void {
     super.applyColour();
-    const colour = (this.sourceBlock as BlockSvg).getColour();
+    const colour = (this.sourceBlock as BlockSvg).style.colourPrimary;
     this.textInputBubble?.setColour(colour);
+    this.textBubble?.setColour(colour);
   }
 
   /**
    * Updates the state of the bubble (editable / noneditable) to reflect the
    * state of the bubble if the bubble is currently shown.
    */
-  override async updateEditable(): Promise<void> {
+  override updateEditable(): void {
     super.updateEditable();
     if (this.bubbleIsVisible()) {
       // Close and reopen the bubble to display the correct UI.
-      await this.setBubbleVisible(false);
-      await this.setBubbleVisible(true);
+      this.setBubbleVisible(false);
+      this.setBubbleVisible(true);
     }
   }
 
   override onLocationChange(blockOrigin: Coordinate): void {
-    const oldLocation = this.workspaceLocation;
     super.onLocationChange(blockOrigin);
-    if (this.bubbleLocation) {
-      const newLocation = this.workspaceLocation;
-      const delta = Coordinate.difference(newLocation, oldLocation);
-      this.bubbleLocation = Coordinate.sum(this.bubbleLocation, delta);
-    }
     const anchorLocation = this.getAnchorLocation();
     this.textInputBubble?.setAnchorLocation(anchorLocation);
+    this.textBubble?.setAnchorLocation(anchorLocation);
   }
 
   /** Sets the text of this comment. Updates any bubbles if they are visible. */
   setText(text: string) {
     const oldText = this.text;
     eventUtils.fire(
-      new (eventUtils.get(EventType.BLOCK_CHANGE))(
+      new (eventUtils.get(eventUtils.BLOCK_CHANGE))(
         this.sourceBlock,
         'comment',
         null,
@@ -173,6 +168,7 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
     );
     this.text = text;
     this.textInputBubble?.setText(this.text);
+    this.textBubble?.setText(this.text);
   }
 
   /** Returns the text of this comment. */
@@ -195,41 +191,17 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
   }
 
   /**
-   * Sets the location of the comment bubble in the workspace.
-   */
-  setBubbleLocation(location: Coordinate) {
-    this.bubbleLocation = location;
-    this.textInputBubble?.moveDuringDrag(location);
-  }
-
-  /**
-   * @returns the location of the comment bubble in the workspace.
-   */
-  getBubbleLocation(): Coordinate | undefined {
-    return this.bubbleLocation;
-  }
-
-  /**
    * @returns the state of the comment as a JSON serializable value if the
    * comment has text. Otherwise returns null.
    */
   saveState(): CommentState | null {
     if (this.text) {
-      const state: CommentState = {
+      return {
         'text': this.text,
         'pinned': this.bubbleIsVisible(),
         'height': this.bubbleSize.height,
         'width': this.bubbleSize.width,
       };
-      const location = this.getBubbleLocation();
-      if (location) {
-        state['x'] = this.sourceBlock.workspace.RTL
-          ? this.sourceBlock.workspace.getWidth() -
-            (location.x + this.bubbleSize.width)
-          : location.x;
-        state['y'] = location.y;
-      }
-      return state;
     }
     return null;
   }
@@ -242,17 +214,8 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
       state['height'] ?? DEFAULT_BUBBLE_HEIGHT,
     );
     this.bubbleVisiblity = state['pinned'] ?? false;
-    this.setBubbleVisible(this.bubbleVisiblity);
-    let x = state['x'];
-    const y = state['y'];
-    renderManagement.finishQueuedRenders().then(() => {
-      if (x && y) {
-        x = this.sourceBlock.workspace.RTL
-          ? this.sourceBlock.workspace.getWidth() - (x + this.bubbleSize.width)
-          : x;
-        this.setBubbleLocation(new Coordinate(x, y));
-      }
-    });
+    // Give the block a chance to be positioned and rendered before showing.
+    setTimeout(() => this.setBubbleVisible(this.bubbleVisiblity), 1);
   }
 
   override onClick(): void {
@@ -275,7 +238,7 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
     if (this.text === newText) return;
 
     eventUtils.fire(
-      new (eventUtils.get(EventType.BLOCK_CHANGE))(
+      new (eventUtils.get(eventUtils.BLOCK_CHANGE))(
         this.sourceBlock,
         'comment',
         null,
@@ -296,28 +259,17 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
     }
   }
 
-  onBubbleLocationChange(): void {
-    if (this.textInputBubble) {
-      this.bubbleLocation = this.textInputBubble.getRelativeToSurfaceXY();
-    }
-  }
-
   bubbleIsVisible(): boolean {
     return this.bubbleVisiblity;
   }
 
-  async setBubbleVisible(visible: boolean): Promise<void> {
-    if (this.bubbleVisiblity === visible) return;
+  setBubbleVisible(visible: boolean): void {
+    if (visible && (this.textBubble || this.textInputBubble)) return;
+    if (!visible && !(this.textBubble || this.textInputBubble)) return;
+
     this.bubbleVisiblity = visible;
 
-    await renderManagement.finishQueuedRenders();
-
-    if (
-      !this.sourceBlock.rendered ||
-      this.sourceBlock.isInFlyout ||
-      this.sourceBlock.isInsertionMarker()
-    )
-      return;
+    if (!this.sourceBlock.rendered || this.sourceBlock.isInFlyout) return;
 
     if (visible) {
       if (this.sourceBlock.isEditable()) {
@@ -331,7 +283,7 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
     }
 
     eventUtils.fire(
-      new (eventUtils.get(EventType.BUBBLE_OPEN))(
+      new (eventUtils.get(eventUtils.BUBBLE_OPEN))(
         this.sourceBlock,
         visible,
         'comment',
@@ -339,28 +291,11 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
     );
   }
 
-  /** See IHasBubble.getBubble. */
-  getBubble(): IBubble | null {
-    return this.textInputBubble;
-  }
-
   /**
    * Shows the editable text bubble for this comment, and adds change listeners
    * to update the state of this icon in response to changes in the bubble.
    */
   private showEditableBubble() {
-    this.createBubble();
-    this.textInputBubble?.addTextChangeListener(() => this.onTextChange());
-    this.textInputBubble?.addSizeChangeListener(() => this.onSizeChange());
-  }
-
-  /** Shows the non editable text bubble for this comment. */
-  private showNonEditableBubble() {
-    this.createBubble();
-    this.textInputBubble?.setEditable(false);
-  }
-
-  protected createBubble() {
     this.textInputBubble = new TextInputBubble(
       this.sourceBlock.workspace as WorkspaceSvg,
       this.getAnchorLocation(),
@@ -368,13 +303,17 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
     );
     this.textInputBubble.setText(this.getText());
     this.textInputBubble.setSize(this.bubbleSize, true);
-    if (this.bubbleLocation) {
-      this.textInputBubble.moveDuringDrag(this.bubbleLocation);
-    }
     this.textInputBubble.addTextChangeListener(() => this.onTextChange());
     this.textInputBubble.addSizeChangeListener(() => this.onSizeChange());
-    this.textInputBubble.addLocationChangeListener(() =>
-      this.onBubbleLocationChange(),
+  }
+
+  /** Shows the non editable text bubble for this comment. */
+  private showNonEditableBubble() {
+    this.textBubble = new TextBubble(
+      this.getText(),
+      this.sourceBlock.workspace as WorkspaceSvg,
+      this.getAnchorLocation(),
+      this.getBubbleOwnerRect(),
     );
   }
 
@@ -382,6 +321,8 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
   private hideBubble() {
     this.textInputBubble?.dispose();
     this.textInputBubble = null;
+    this.textBubble?.dispose();
+    this.textBubble = null;
   }
 
   /**
@@ -401,29 +342,16 @@ export class CommentIcon extends Icon implements IHasBubble, ISerializable {
    *     I.E. the block that owns this icon.
    */
   private getBubbleOwnerRect(): Rect {
-    return (this.sourceBlock as BlockSvg).getBoundingRectangleWithoutChildren();
+    const bbox = (this.sourceBlock as BlockSvg).getSvgRoot().getBBox();
+    return new Rect(bbox.y, bbox.y + bbox.height, bbox.x, bbox.x + bbox.width);
   }
 }
 
-/** The save state format for a comment icon. */
 export interface CommentState {
-  /** The text of the comment. */
   text?: string;
-
-  /** True if the comment is open, false otherwise. */
   pinned?: boolean;
-
-  /** The height of the comment bubble. */
   height?: number;
-
-  /** The width of the comment bubble. */
   width?: number;
-
-  /** The X coordinate of the comment bubble. */
-  x?: number;
-
-  /** The Y coordinate of the comment bubble. */
-  y?: number;
 }
 
 registry.register(CommentIcon.TYPE, CommentIcon);

@@ -11,13 +11,13 @@
 
 // Former goog.module ID: Blockly.Python
 
-import type {Block} from '../../core/block.js';
-import {CodeGenerator} from '../../core/generator.js';
-import {inputTypes} from '../../core/inputs/input_types.js';
-import {Names} from '../../core/names.js';
 import * as stringUtils from '../../core/utils/string.js';
 import * as Variables from '../../core/variables.js';
+import type {Block} from '../../core/block.js';
+import {CodeGenerator} from '../../core/generator.js';
+import {Names} from '../../core/names.js';
 import type {Workspace} from '../../core/workspace.js';
+import {inputTypes} from '../../core/inputs/input_types.js';
 
 /**
  * Order of operation ENUMs.
@@ -243,8 +243,8 @@ export class PythonGenerator extends CodeGenerator {
 
     // Follow the CPython behaviour of repr() for a non-byte string.
     let quote = "'";
-    if (string.includes("'")) {
-      if (!string.includes('"')) {
+    if (string.indexOf("'") !== -1) {
+      if (string.indexOf('"') === -1) {
         quote = '"';
       } else {
         string = string.replace(/'/g, "\\'");
@@ -276,6 +276,7 @@ export class PythonGenerator extends CodeGenerator {
    * @param code The Python code created for this block.
    * @param thisOnly True to generate code for only this statement.
    * @returns Python code with comments and subsequent blocks added.
+
    */
   scrub_(block: Block, code: string, thisOnly = false): string {
     let commentCode = '';

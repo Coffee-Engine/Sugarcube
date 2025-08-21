@@ -10,12 +10,12 @@
 
 // Former goog.module ID: Blockly.Python.texts
 
-import type {JoinMutatorBlock} from '../../blocks/text.js';
-import type {Block} from '../../core/block.js';
-import {NameType} from '../../core/names.js';
 import * as stringUtils from '../../core/utils/string.js';
-import type {PythonGenerator} from './python_generator.js';
+import type {Block} from '../../core/block.js';
+import type {JoinMutatorBlock} from '../../blocks/text.js';
+import {NameType} from '../../core/names.js';
 import {Order} from './python_generator.js';
+import type {PythonGenerator} from './python_generator.js';
 
 export function text(
   block: Block,
@@ -24,6 +24,16 @@ export function text(
   // Text value.
   const code = generator.quote_(block.getFieldValue('TEXT'));
   return [code, Order.ATOMIC];
+}
+
+export function text_multiline(
+  block: Block,
+  generator: PythonGenerator,
+): [string, Order] {
+  // Text value.
+  const code = generator.multiline_quote_(block.getFieldValue('TEXT'));
+  const order = code.indexOf('+') !== -1 ? Order.ADDITIVE : Order.ATOMIC;
+  return [code, order];
 }
 
 /**

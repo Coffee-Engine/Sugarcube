@@ -20,8 +20,7 @@ import type {Connection} from '../connection.js';
 import type {ConnectionType} from '../connection_type.js';
 import type {Field} from '../field.js';
 import * as fieldRegistry from '../field_registry.js';
-import {RenderedConnection} from '../rendered_connection.js';
-import {Align} from './align.js';
+import type {RenderedConnection} from '../rendered_connection.js';
 import {inputTypes} from './input_types.js';
 
 /** Class for an input with optional fields. */
@@ -103,7 +102,10 @@ export class Input {
     }
 
     field.setSourceBlock(this.sourceBlock);
-    if (this.sourceBlock.initialized) this.initField(field);
+    if (this.sourceBlock.rendered) {
+      field.init();
+      field.applyColour();
+    }
     field.name = opt_name;
     field.setVisible(this.isVisible());
 
@@ -121,6 +123,8 @@ export class Input {
 
     if (this.sourceBlock.rendered) {
       (this.sourceBlock as BlockSvg).queueRender();
+      // Adding a field will cause the block to change shape.
+      this.sourceBlock.bumpNeighbours();
     }
     return index;
   }
@@ -141,6 +145,8 @@ export class Input {
         this.fieldRow.splice(i, 1);
         if (this.sourceBlock.rendered) {
           (this.sourceBlock as BlockSvg).queueRender();
+          // Removing a field will cause the block to change shape.
+          this.sourceBlock.bumpNeighbours();
         }
         return true;
       }
@@ -181,14 +187,15 @@ export class Input {
     for (let y = 0, field; (field = this.fieldRow[y]); y++) {
       field.setVisible(visible);
     }
-    if (this.connection && this.connection instanceof RenderedConnection) {
+    if (this.connection) {
+      const renderedConnection = this.connection as RenderedConnection;
       // Has a connection.
       if (visible) {
-        renderList = this.connection.startTrackingAll();
+        renderList = renderedConnection.startTrackingAll();
       } else {
-        this.connection.stopTrackingAll();
+        renderedConnection.stopTrackingAll();
       }
-      const child = this.connection.targetBlock();
+      const child = renderedConnection.targetBlock();
       if (child) {
         child.getSvgRoot().style.display = visible ? 'block' : 'none';
       }
@@ -266,28 +273,11 @@ export class Input {
 
   /** Initialize the fields on this input. */
   init() {
-    for (const field of this.fieldRow) {
-      field.init();
+    if (!this.sourceBlock.workspace.rendered) {
+      return; // Headless blocks don't need fields initialized.
     }
-  }
-
-  /**
-   * Initializes the fields on this input for a headless block.
-   *
-   * @internal
-   */
-  public initModel() {
-    for (const field of this.fieldRow) {
-      field.initModel();
-    }
-  }
-
-  /** Initializes the given field. */
-  private initField(field: Field) {
-    if (this.sourceBlock.rendered) {
-      field.init();
-    } else {
-      field.initModel();
+    for (let i = 0; i < this.fieldRow.length; i++) {
+      this.fieldRow[i].init();
     }
   }
 
@@ -315,3 +305,25 @@ export class Input {
     return this.sourceBlock.makeConnection_(type);
   }
 }
+
+export namespace Input {
+  // TODO(v11): When this is removed in v11, also re-enable errors on access
+  //     of deprecated things (in build_tasks.js).
+  /**
+   * Enum for alignment of inputs.
+   *
+   * @deprecated Use Blockly.inputs.Align. To be removed in v11.
+   */
+  export enum Align {
+    LEFT = -1,
+    CENTRE = 0,
+    RIGHT = 1,
+  }
+}
+
+/** @deprecated Use Blockly.inputs.Align. To be removed in v11. */
+/** @suppress {deprecated} */
+export type Align = Input.Align;
+/** @deprecated Use Blockly.inputs.Align. To be removed in v11. */
+/** @suppress {deprecated} */
+export const Align = Input.Align;

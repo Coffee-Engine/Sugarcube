@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../node_modules/chai/chai.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
@@ -27,9 +26,9 @@ suite('Variable Model', function () {
       'test_type',
       'test_id',
     );
-    assert.equal(variable.getName(), 'test');
-    assert.equal(variable.getType(), 'test_type');
-    assert.equal(variable.getId(), 'test_id');
+    chai.assert.equal(variable.name, 'test');
+    chai.assert.equal(variable.type, 'test_type');
+    chai.assert.equal(variable.id_, 'test_id');
   });
 
   test('Null type', function () {
@@ -39,7 +38,7 @@ suite('Variable Model', function () {
       null,
       'test_id',
     );
-    assert.equal(variable.getType(), '');
+    chai.assert.equal(variable.type, '');
   });
 
   test('Undefined type', function () {
@@ -49,7 +48,7 @@ suite('Variable Model', function () {
       undefined,
       'test_id',
     );
-    assert.equal(variable.getType(), '');
+    chai.assert.equal(variable.type, '');
   });
 
   test('Null id', function () {
@@ -59,9 +58,9 @@ suite('Variable Model', function () {
       'test_type',
       null,
     );
-    assert.equal(variable.getName(), 'test');
-    assert.equal(variable.getType(), 'test_type');
-    assert.exists(variable.getId());
+    chai.assert.equal(variable.name, 'test');
+    chai.assert.equal(variable.type, 'test_type');
+    chai.assert.exists(variable.id_);
   });
 
   test('Undefined id', function () {
@@ -71,15 +70,15 @@ suite('Variable Model', function () {
       'test_type',
       undefined,
     );
-    assert.equal(variable.getName(), 'test');
-    assert.equal(variable.getType(), 'test_type');
-    assert.exists(variable.getId());
+    chai.assert.equal(variable.name, 'test');
+    chai.assert.equal(variable.type, 'test_type');
+    chai.assert.exists(variable.id_);
   });
 
   test('Only name provided', function () {
     const variable = new Blockly.VariableModel(this.workspace, 'test');
-    assert.equal(variable.getName(), 'test');
-    assert.equal(variable.getType(), '');
-    assert.exists(variable.getId());
+    chai.assert.equal(variable.name, 'test');
+    chai.assert.equal(variable.type, '');
+    chai.assert.exists(variable.id_);
   });
 });

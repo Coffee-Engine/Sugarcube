@@ -13,8 +13,8 @@ import * as utilsColour from '../../utils/colour.js';
 import * as dom from '../../utils/dom.js';
 import {Svg} from '../../utils/svg.js';
 import * as svgPaths from '../../utils/svg_paths.js';
-import type {Shape} from '../common/constants.js';
 import {ConstantProvider as BaseConstantProvider} from '../common/constants.js';
+import type {Shape} from '../common/constants.js';
 
 /** An object containing sizing and path information about inside corners. */
 export interface InsideCorners {
@@ -151,18 +151,8 @@ export class ConstantProvider extends BaseConstantProvider {
    */
   SQUARED: Shape | null = null;
 
-  /**
-   * Creates a new ConstantProvider.
-   *
-   * @param gridUnit If set, defines the base unit used to calculate other
-   *     constants.
-   */
-  constructor(gridUnit?: number) {
+  constructor() {
     super();
-
-    if (gridUnit) {
-      this.GRID_UNIT = gridUnit;
-    }
 
     this.SMALL_PADDING = this.GRID_UNIT;
 
@@ -300,10 +290,7 @@ export class ConstantProvider extends BaseConstantProvider {
       svgPaths.point(71, -height),
       svgPaths.point(width, 0),
     ]);
-    // Height is actually the Y position of the control points defining the
-    // curve of the hat; the hat's actual rendered height is 3/4 of the control
-    // points' Y position, per https://stackoverflow.com/a/5327329
-    return {height: height * 0.75, width, path: mainPath};
+    return {height, width, path: mainPath};
   }
 
   /**
@@ -549,13 +536,13 @@ export class ConstantProvider extends BaseConstantProvider {
           }
         }
         // Includes doesn't work in IE.
-        if (checks && checks.includes('Boolean')) {
+        if (checks && checks.indexOf('Boolean') !== -1) {
           return this.HEXAGONAL!;
         }
-        if (checks && checks.includes('Number')) {
+        if (checks && checks.indexOf('Number') !== -1) {
           return this.ROUNDED!;
         }
-        if (checks && checks.includes('String')) {
+        if (checks && checks.indexOf('String') !== -1) {
           return this.ROUNDED!;
         }
         return this.ROUNDED!;
@@ -675,13 +662,8 @@ export class ConstantProvider extends BaseConstantProvider {
     return utilsColour.blend('#000', colour, 0.25) || colour;
   }
 
-  override createDom(
-    svg: SVGElement,
-    tagName: string,
-    selector: string,
-    injectionDivIfIsParent?: HTMLElement,
-  ) {
-    super.createDom(svg, tagName, selector, injectionDivIfIsParent);
+  override createDom(svg: SVGElement, tagName: string, selector: string) {
+    super.createDom(svg, tagName, selector);
     /*
         <defs>
           ... filters go here ...
@@ -800,24 +782,11 @@ export class ConstantProvider extends BaseConstantProvider {
     );
     this.replacementGlowFilterId = replacementGlowFilter.id;
     this.replacementGlowFilter = replacementGlowFilter;
-
-    if (injectionDivIfIsParent) {
-      // If this renderer is for the parent workspace, add CSS variables scoped
-      // to the injection div referencing the created patterns so that CSS can
-      // apply the patterns to any element in the injection div.
-      injectionDivIfIsParent.style.setProperty(
-        '--blocklySelectedGlowFilter',
-        `url(#${this.selectedGlowFilterId})`,
-      );
-      injectionDivIfIsParent.style.setProperty(
-        '--blocklyReplacementGlowFilter',
-        `url(#${this.replacementGlowFilterId})`,
-      );
-    }
   }
 
   override getCSS_(selector: string) {
     return [
+      /* eslint-disable indent */
       // Text.
       `${selector} .blocklyText,`,
       `${selector} .blocklyFlyoutLabelText {`,
@@ -825,22 +794,18 @@ export class ConstantProvider extends BaseConstantProvider {
         `pt ${this.FIELD_TEXT_FONTFAMILY};`,
       `}`,
 
-      `${selector} .blocklyTextInputBubble textarea {`,
-      `font-weight: normal;`,
-      `}`,
-
       // Fields.
       `${selector} .blocklyText {`,
       `fill: #fff;`,
       `}`,
-      `${selector} .blocklyNonEditableField>rect:not(.blocklyDropdownRect),`,
-      `${selector} .blocklyEditableField>rect:not(.blocklyDropdownRect) {`,
+      `${selector} .blocklyNonEditableText>rect:not(.blocklyDropdownRect),`,
+      `${selector} .blocklyEditableText>rect:not(.blocklyDropdownRect) {`,
       `fill: ${this.FIELD_BORDER_RECT_COLOUR};`,
       `}`,
-      `${selector} .blocklyNonEditableField>text,`,
-      `${selector} .blocklyEditableField>text,`,
-      `${selector} .blocklyNonEditableField>g>text,`,
-      `${selector} .blocklyEditableField>g>text {`,
+      `${selector} .blocklyNonEditableText>text,`,
+      `${selector} .blocklyEditableText>text,`,
+      `${selector} .blocklyNonEditableText>g>text,`,
+      `${selector} .blocklyEditableText>g>text {`,
       `fill: #575E75;`,
       `}`,
 
@@ -856,9 +821,9 @@ export class ConstantProvider extends BaseConstantProvider {
 
       // Editable field hover.
       `${selector} .blocklyDraggable:not(.blocklyDisabled)`,
-      ` .blocklyEditableField:not(.blocklyEditing):hover>rect,`,
+      ` .blocklyEditableText:not(.editing):hover>rect,`,
       `${selector} .blocklyDraggable:not(.blocklyDisabled)`,
-      ` .blocklyEditableField:not(.blocklyEditing):hover>.blocklyPath {`,
+      ` .blocklyEditableText:not(.editing):hover>.blocklyPath {`,
       `stroke: #fff;`,
       `stroke-width: 2;`,
       `}`,
@@ -872,15 +837,15 @@ export class ConstantProvider extends BaseConstantProvider {
 
       // Dropdown field.
       `${selector} .blocklyDropdownText {`,
-      `fill: #fff;`,
+      `fill: #fff !important;`,
       `}`,
 
       // Widget and Dropdown Div
-      `${selector}.blocklyWidgetDiv .blocklyMenuItem,`,
-      `${selector}.blocklyDropDownDiv .blocklyMenuItem {`,
+      `${selector}.blocklyWidgetDiv .goog-menuitem,`,
+      `${selector}.blocklyDropDownDiv .goog-menuitem {`,
       `font-family: ${this.FIELD_TEXT_FONTFAMILY};`,
       `}`,
-      `${selector}.blocklyDropDownDiv .blocklyMenuItemContent {`,
+      `${selector}.blocklyDropDownDiv .goog-menuitem-content {`,
       `color: #fff;`,
       `}`,
 
@@ -890,8 +855,8 @@ export class ConstantProvider extends BaseConstantProvider {
       `}`,
 
       // Disabled outline paths.
-      `${selector} .blocklyDisabledPattern > .blocklyOutlinePath {`,
-      `fill: var(--blocklyDisabledPattern)`,
+      `${selector} .blocklyDisabled > .blocklyOutlinePath {`,
+      `fill: url(#blocklyDisabledPattern${this.randomIdentifier})`,
       `}`,
 
       // Insertion marker.
@@ -899,15 +864,7 @@ export class ConstantProvider extends BaseConstantProvider {
       `fill-opacity: ${this.INSERTION_MARKER_OPACITY};`,
       `stroke: none;`,
       `}`,
-
-      `${selector} .blocklySelected>.blocklyPath.blocklyPathSelected {`,
-      `fill: none;`,
-      `filter: var(--blocklySelectedGlowFilter);`,
-      `}`,
-
-      `${selector} .blocklyReplaceable>.blocklyPath {`,
-      `filter: var(--blocklyReplacementGlowFilter);`,
-      `}`,
     ];
   }
 }
+/* eslint-enable indent */

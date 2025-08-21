@@ -4,16 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../node_modules/chai/chai.js';
+import {
+  sharedTestSetup,
+  sharedTestTeardown,
+} from './test_helpers/setup_teardown.js';
 import {
   createRenderedBlock,
   defineMutatorBlocks,
 } from './test_helpers/block_definitions.js';
 import {assertEventFired, assertEventNotFired} from './test_helpers/events.js';
-import {
-  sharedTestSetup,
-  sharedTestTeardown,
-} from './test_helpers/setup_teardown.js';
 
 suite('Mutator', function () {
   setup(function () {
@@ -32,10 +31,10 @@ suite('Mutator', function () {
       sharedTestTeardown.call(this);
     });
 
-    test('No change', async function () {
+    test('No change', function () {
       const block = createRenderedBlock(this.workspace, 'xml_block');
       const icon = block.getIcon(Blockly.icons.MutatorIcon.TYPE);
-      await icon.setBubbleVisible(true);
+      icon.setBubbleVisible(true);
       const mutatorWorkspace = icon.getWorkspace();
       // Trigger mutator change listener.
       createRenderedBlock(mutatorWorkspace, 'checkbox_block');
@@ -44,15 +43,15 @@ suite('Mutator', function () {
       });
     });
 
-    test('XML', async function () {
+    test('XML', function () {
       const block = createRenderedBlock(this.workspace, 'xml_block');
       const icon = block.getIcon(Blockly.icons.MutatorIcon.TYPE);
-      await icon.setBubbleVisible(true);
+      icon.setBubbleVisible(true);
       const mutatorWorkspace = icon.getWorkspace();
       mutatorWorkspace
         .getBlockById('check_block')
         .setFieldValue('TRUE', 'CHECK');
-      assert.isTrue(
+      chai.assert.isTrue(
         this.eventsFireStub
           .getCalls()
           .some(
@@ -64,10 +63,10 @@ suite('Mutator', function () {
       );
     });
 
-    test('JSO', async function () {
+    test('JSO', function () {
       const block = createRenderedBlock(this.workspace, 'jso_block');
       const icon = block.getIcon(Blockly.icons.MutatorIcon.TYPE);
-      await icon.setBubbleVisible(true);
+      icon.setBubbleVisible(true);
       const mutatorWorkspace = icon.getWorkspace();
       mutatorWorkspace
         .getBlockById('check_block')

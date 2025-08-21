@@ -5,8 +5,6 @@
  */
 
 import * as Blockly from '../../build/src/core/blockly.js';
-import {assert} from '../../node_modules/chai/chai.js';
-import {defineRowBlock} from './test_helpers/block_definitions.js';
 import {
   assertFieldValue,
   runConstructorSuiteTests,
@@ -18,6 +16,7 @@ import {
   sharedTestTeardown,
   workspaceTeardown,
 } from './test_helpers/setup_teardown.js';
+import {defineRowBlock} from './test_helpers/block_definitions.js';
 
 suite('Checkbox Fields', function () {
   setup(function () {
@@ -224,7 +223,7 @@ suite('Checkbox Fields', function () {
         };
         field.initView();
         field.render_();
-        assert(field.textContent_.nodeValue, char);
+        chai.assert(field.textContent_.nodeValue, char);
       }
       test('Constant', function () {
         const checkChar = Blockly.FieldCheckbox.CHECK_CHAR;
@@ -252,7 +251,7 @@ suite('Checkbox Fields', function () {
         assertCharacter(field, Blockly.FieldCheckbox.CHECK_CHAR);
         field.setCheckCharacter('\u2661');
         // Don't call assertCharacter b/c we don't want to re-initialize.
-        assert.equal(field.textContent_.nodeValue, '\u2661');
+        chai.assert.equal(field.textContent_.nodeValue, '\u2661');
       });
       test('setCheckCharacter Before Init', function () {
         const field = new Blockly.FieldCheckbox();
@@ -265,7 +264,10 @@ suite('Checkbox Fields', function () {
         });
         assertCharacter(field, '\u2661');
         field.setCheckCharacter(null);
-        assert(field.textContent_.nodeValue, Blockly.FieldCheckbox.CHECK_CHAR);
+        chai.assert(
+          field.textContent_.nodeValue,
+          Blockly.FieldCheckbox.CHECK_CHAR,
+        );
       });
     });
   });
@@ -280,7 +282,7 @@ suite('Checkbox Fields', function () {
         const field = new Blockly.FieldCheckbox(value);
         block.getInput('INPUT').appendField(field, 'CHECK');
         const jso = Blockly.serialization.blocks.save(block);
-        assert.deepEqual(jso['fields'], {'CHECK': value});
+        chai.assert.deepEqual(jso['fields'], {'CHECK': value});
       };
     });
 

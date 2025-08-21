@@ -617,7 +617,7 @@ export class ConstantProvider {
   getBlockStyle(blockStyleName: string | null): BlockStyle {
     return (
       this.blockStyles[blockStyleName || ''] ||
-      (blockStyleName && blockStyleName.startsWith('auto_')
+      (blockStyleName && blockStyleName.indexOf('auto_') === 0
         ? this.getBlockStyleForColour(blockStyleName.substring(5)).style
         : this.createBlockStyle_('#000000'))
     );
@@ -657,13 +657,6 @@ export class ConstantProvider {
     valid.colourTertiary = valid['colourTertiary']
       ? parsing.parseBlockColour(valid['colourTertiary']).hex
       : this.generateTertiaryColour_(valid.colourPrimary);
-    valid.colourQuaternary = valid['colourQuaternary']
-      ? parsing.parseBlockColour(valid['colourQuaternary']).hex
-      : this.generateTertiaryColour_(valid.colourPrimary);
-    valid.colourQuinary = parsedColour.hex;
-    valid.useBlackWhiteFields = valid['useBlackWhiteFields']
-      ? valid['useBlackWhiteFields']
-      : false;
 
     valid.hat = valid['hat'] || '';
     return valid;
@@ -734,10 +727,7 @@ export class ConstantProvider {
       svgPaths.point(70, -height),
       svgPaths.point(width, 0),
     ]);
-    // Height is actually the Y position of the control points defining the
-    // curve of the hat; the hat's actual rendered height is 3/4 of the control
-    // points' Y position, per https://stackoverflow.com/a/5327329
-    return {height: height * 0.75, width, path: mainPath};
+    return {height, width, path: mainPath};
   }
 
   /**
@@ -933,18 +923,8 @@ export class ConstantProvider {
    * @param svg The root of the workspace's SVG.
    * @param tagName The name to use for the CSS style tag.
    * @param selector The CSS selector to use.
-   * @param injectionDivIfIsParent The div containing the parent workspace and
-   *   all related workspaces and block containers, if this renderer is for the
-   *   parent workspace. CSS variables representing SVG patterns will be scoped
-   *   to this container. Child workspaces should not override the CSS variables
-   *   created by the parent and thus do not need access to the injection div.
    */
-  createDom(
-    svg: SVGElement,
-    tagName: string,
-    selector: string,
-    injectionDivIfIsParent?: HTMLElement,
-  ) {
+  createDom(svg: SVGElement, tagName: string, selector: string) {
     this.injectCSS_(tagName, selector);
 
     /*
@@ -1051,24 +1031,6 @@ export class ConstantProvider {
     this.disabledPattern = disabledPattern;
 
     this.createDebugFilter();
-
-    if (injectionDivIfIsParent) {
-      // If this renderer is for the parent workspace, add CSS variables scoped
-      // to the injection div referencing the created patterns so that CSS can
-      // apply the patterns to any element in the injection div.
-      injectionDivIfIsParent.style.setProperty(
-        '--blocklyEmbossFilter',
-        `url(#${this.embossFilterId})`,
-      );
-      injectionDivIfIsParent.style.setProperty(
-        '--blocklyDisabledPattern',
-        `url(#${this.disabledPatternId})`,
-      );
-      injectionDivIfIsParent.style.setProperty(
-        '--blocklyDebugFilter',
-        `url(#${this.debugFilterId})`,
-      );
-    }
   }
 
   /**
@@ -1170,14 +1132,14 @@ export class ConstantProvider {
       `${selector} .blocklyText {`,
         `fill: #fff;`,
       `}`,
-      `${selector} .blocklyNonEditableField>rect,`,
-      `${selector} .blocklyEditableField>rect {`,
+      `${selector} .blocklyNonEditableText>rect,`,
+      `${selector} .blocklyEditableText>rect {`,
         `fill: ${this.FIELD_BORDER_RECT_COLOUR};`,
         `fill-opacity: .6;`,
         `stroke: none;`,
       `}`,
-      `${selector} .blocklyNonEditableField>text,`,
-      `${selector} .blocklyEditableField>text {`,
+      `${selector} .blocklyNonEditableText>text,`,
+      `${selector} .blocklyEditableText>text {`,
         `fill: #000;`,
       `}`,
 
@@ -1192,7 +1154,7 @@ export class ConstantProvider {
       `}`,
 
       // Editable field hover.
-      `${selector} .blocklyEditableField:not(.blocklyEditing):hover>rect {`,
+      `${selector} .blocklyEditableText:not(.editing):hover>rect {`,
         `stroke: #fff;`,
         `stroke-width: 2;`,
       `}`,

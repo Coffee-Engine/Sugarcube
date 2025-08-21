@@ -10,9 +10,9 @@
 
 // Former goog.module ID: Blockly.Dart.texts
 
-import type {JoinMutatorBlock} from '../../blocks/text.js';
 import type {Block} from '../../core/block.js';
 import type {DartGenerator} from './dart_generator.js';
+import type {JoinMutatorBlock} from '../../blocks/text.js';
 import {Order} from './dart_generator.js';
 
 // RESERVED WORDS: 'Html,Math'
@@ -21,6 +21,16 @@ export function text(block: Block, generator: DartGenerator): [string, Order] {
   // Text value.
   const code = generator.quote_(block.getFieldValue('TEXT'));
   return [code, Order.ATOMIC];
+}
+
+export function text_multiline(
+  block: Block,
+  generator: DartGenerator,
+): [string, Order] {
+  // Text value.
+  const code = generator.multiline_quote_(block.getFieldValue('TEXT'));
+  const order = code.indexOf('+') !== -1 ? Order.ADDITIVE : Order.ATOMIC;
+  return [code, order];
 }
 
 export function text_join(
@@ -118,12 +128,10 @@ export function text_charAt(
       return [code, Order.UNARY_POSTFIX];
     }
     case 'LAST':
+      at = 1;
+    // Fall through.
     case 'FROM_END': {
-      if (where === 'LAST') {
-        at = 1;
-      } else {
-        at = generator.getAdjusted(block, 'AT', 1);
-      }
+      at = generator.getAdjusted(block, 'AT', 1);
       const functionName = generator.provideFunction_(
         'text_get_from_end',
         `
@@ -132,7 +140,7 @@ String ${generator.FUNCTION_NAME_PLACEHOLDER_}(String text, num x) {
 }
 `,
       );
-      const code = `${functionName}(${text}, ${at})`;
+      const code = functionName + '(' + text + ', ' + at + ')';
       return [code, Order.UNARY_POSTFIX];
     }
     case 'RANDOM': {

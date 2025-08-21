@@ -17,7 +17,6 @@ import './events/events_click.js';
 import * as browserEvents from './browser_events.js';
 import {ComponentManager} from './component_manager.js';
 import * as Css from './css.js';
-import {EventType} from './events/type.js';
 import * as eventUtils from './events/utils.js';
 import type {IPositionable} from './interfaces/i_positionable.js';
 import type {UiMetrics} from './metrics_manager.js';
@@ -117,7 +116,7 @@ export class ZoomControls implements IPositionable {
   init() {
     this.workspace.getComponentManager().addComponent({
       component: this,
-      weight: ComponentManager.ComponentWeight.ZOOM_CONTROLS_WEIGHT,
+      weight: 2,
       capabilities: [ComponentManager.Capability.POSITIONABLE],
     });
     this.initialized = true;
@@ -468,7 +467,7 @@ export class ZoomControls implements IPositionable {
 
   /** Fires a zoom control UI event. */
   private fireZoomEvent() {
-    const uiEvent = new (eventUtils.get(EventType.CLICK))(
+    const uiEvent = new (eventUtils.get(eventUtils.CLICK))(
       null,
       this.workspace.id,
       'zoom_controls',

@@ -11,12 +11,9 @@
  */
 // Former goog.module ID: Blockly.Names
 
-import type {IVariableMap} from './interfaces/i_variable_map.js';
-import type {
-  IVariableModel,
-  IVariableState,
-} from './interfaces/i_variable_model.js';
 import {Msg} from './msg.js';
+// import * as Procedures from './procedures.js';
+import type {VariableMap} from './variable_map.js';
 import * as Variables from './variables.js';
 import type {Workspace} from './workspace.js';
 
@@ -42,8 +39,7 @@ export class Names {
   /**
    * The variable map from the workspace, containing Blockly variable models.
    */
-  private variableMap: IVariableMap<IVariableModel<IVariableState>> | null =
-    null;
+  private variableMap: VariableMap | null = null;
 
   /**
    * @param reservedWordsList A comma-separated string of words that are illegal
@@ -74,7 +70,7 @@ export class Names {
    *
    * @param map The map to track.
    */
-  setVariableMap(map: IVariableMap<IVariableModel<IVariableState>>) {
+  setVariableMap(map: VariableMap) {
     this.variableMap = map;
   }
 
@@ -99,7 +95,7 @@ export class Names {
     }
     const variable = this.variableMap.getVariableById(id);
     if (variable) {
-      return variable.getName();
+      return variable.name;
     }
     return null;
   }
@@ -222,7 +218,7 @@ export class Names {
       // https://github.com/google/blockly/issues/1654
       name = encodeURI(name.replace(/ /g, '_')).replace(/[^\w]/g, '_');
       // Most languages don't allow names with leading numbers.
-      if ('0123456789'.includes(name[0])) {
+      if ('0123456789'.indexOf(name[0]) !== -1) {
         name = 'my_' + name;
       }
     }

@@ -12,10 +12,10 @@
 // Former goog.module ID: Blockly.Events.ToolboxItemSelect
 
 import * as registry from '../registry.js';
-import type {Workspace} from '../workspace.js';
 import {AbstractEventJson} from './events_abstract.js';
 import {UiBase} from './events_ui_base.js';
-import {EventType} from './type.js';
+import * as eventUtils from './utils.js';
+import type {Workspace} from '../workspace.js';
 
 /**
  * Notifies listeners that a toolbox item has been selected.
@@ -27,7 +27,7 @@ export class ToolboxItemSelect extends UiBase {
   /** The newly selected toolbox item. */
   newItem?: string;
 
-  override type = EventType.TOOLBOX_ITEM_SELECT;
+  override type = eventUtils.TOOLBOX_ITEM_SELECT;
 
   /**
    * @param opt_oldItem The previously selected toolbox item.
@@ -91,6 +91,6 @@ export interface ToolboxItemSelectJson extends AbstractEventJson {
 
 registry.register(
   registry.Type.EVENT,
-  EventType.TOOLBOX_ITEM_SELECT,
+  eventUtils.TOOLBOX_ITEM_SELECT,
   ToolboxItemSelect,
 );

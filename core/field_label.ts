@@ -12,9 +12,9 @@
  */
 // Former goog.module ID: Blockly.FieldLabel
 
+import * as dom from './utils/dom.js';
 import {Field, FieldConfig} from './field.js';
 import * as fieldRegistry from './field_registry.js';
-import * as dom from './utils/dom.js';
 import * as parsing from './utils/parsing.js';
 
 /**
@@ -74,9 +74,6 @@ export class FieldLabel extends Field<string> {
     if (this.class) {
       dom.addClass(this.getTextElement(), this.class);
     }
-    if (this.fieldGroup_) {
-      dom.addClass(this.fieldGroup_, 'blocklyLabelField');
-    }
   }
 
   /**
@@ -120,7 +117,7 @@ export class FieldLabel extends Field<string> {
    * @nocollapse
    * @internal
    */
-  static override fromJson(options: FieldLabelFromJsonConfig): FieldLabel {
+  static fromJson(options: FieldLabelFromJsonConfig): FieldLabel {
     const text = parsing.replaceMessageReferences(options.text);
     // `this` might be a subclass of FieldLabel if that class doesn't override
     // the static fromJson method.

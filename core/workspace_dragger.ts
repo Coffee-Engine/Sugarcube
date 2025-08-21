@@ -11,6 +11,7 @@
  */
 // Former goog.module ID: Blockly.WorkspaceDragger
 
+import * as common from './common.js';
 import {Coordinate} from './utils/coordinate.js';
 import type {WorkspaceSvg} from './workspace_svg.js';
 
@@ -20,17 +21,17 @@ import type {WorkspaceSvg} from './workspace_svg.js';
  *
  */
 export class WorkspaceDragger {
-  private readonly horizontalScrollEnabled: boolean;
-  private readonly verticalScrollEnabled: boolean;
+  private readonly horizontalScrollEnabled_: boolean;
+  private readonly verticalScrollEnabled_: boolean;
   protected startScrollXY_: Coordinate;
 
   /** @param workspace The workspace to drag. */
   constructor(private workspace: WorkspaceSvg) {
     /** Whether horizontal scroll is enabled. */
-    this.horizontalScrollEnabled = this.workspace.isMovableHorizontally();
+    this.horizontalScrollEnabled_ = this.workspace.isMovableHorizontally();
 
     /** Whether vertical scroll is enabled. */
-    this.verticalScrollEnabled = this.workspace.isMovableVertically();
+    this.verticalScrollEnabled_ = this.workspace.isMovableVertically();
 
     /**
      * The scroll position of the workspace at the beginning of the drag.
@@ -55,7 +56,11 @@ export class WorkspaceDragger {
    *
    * @internal
    */
-  startDrag() {}
+  startDrag() {
+    if (common.getSelected()) {
+      common.getSelected()!.unselect();
+    }
+  }
 
   /**
    * Finish dragging the workspace and put everything back where it belongs.
@@ -79,11 +84,11 @@ export class WorkspaceDragger {
   drag(currentDragDeltaXY: Coordinate) {
     const newXY = Coordinate.sum(this.startScrollXY_, currentDragDeltaXY);
 
-    if (this.horizontalScrollEnabled && this.verticalScrollEnabled) {
+    if (this.horizontalScrollEnabled_ && this.verticalScrollEnabled_) {
       this.workspace.scroll(newXY.x, newXY.y);
-    } else if (this.horizontalScrollEnabled) {
+    } else if (this.horizontalScrollEnabled_) {
       this.workspace.scroll(newXY.x, this.workspace.scrollY);
-    } else if (this.verticalScrollEnabled) {
+    } else if (this.verticalScrollEnabled_) {
       this.workspace.scroll(this.workspace.scrollX, newXY.y);
     } else {
       throw new TypeError('Invalid state.');

@@ -8,19 +8,12 @@
 
 import {BlockSvg} from './block_svg.js';
 import * as clipboard from './clipboard.js';
-import {RenderedWorkspaceComment} from './comments.js';
-import * as eventUtils from './events/utils.js';
-import {getFocusManager} from './focus_manager.js';
-import {isCopyable as isICopyable} from './interfaces/i_copyable.js';
-import {isDeletable as isIDeletable} from './interfaces/i_deletable.js';
-import {isDraggable} from './interfaces/i_draggable.js';
-import {IFocusableNode} from './interfaces/i_focusable_node.js';
+import * as common from './common.js';
+import {Gesture} from './gesture.js';
+import {ICopyData, isCopyable} from './interfaces/i_copyable.js';
 import {KeyboardShortcut, ShortcutRegistry} from './shortcut_registry.js';
-import {Coordinate} from './utils/coordinate.js';
 import {KeyCodes} from './utils/keycodes.js';
-import {Rect} from './utils/rect.js';
-import * as svgMath from './utils/svg_math.js';
-import {WorkspaceSvg} from './workspace_svg.js';
+import type {WorkspaceSvg} from './workspace_svg.js';
 
 /**
  * Object holding the names of the default shortcut items.
@@ -42,10 +35,12 @@ export function registerEscape() {
   const escapeAction: KeyboardShortcut = {
     name: names.ESCAPE,
     preconditionFn(workspace) {
-      return !workspace.isReadOnly();
+      return !workspace.options.readOnly;
     },
     callback(workspace) {
-      workspace.hideChaff();
+      // AnyDuringMigration because:  Property 'hideChaff' does not exist on
+      // type 'Workspace'.
+      (workspace as AnyDuringMigration).hideChaff();
       return true;
     },
     keyCodes: [KeyCodes.ESC],
@@ -59,32 +54,25 @@ export function registerEscape() {
 export function registerDelete() {
   const deleteShortcut: KeyboardShortcut = {
     name: names.DELETE,
-    preconditionFn(workspace, scope) {
-      const focused = scope.focusedNode;
+    preconditionFn(workspace) {
+      const selected = common.getSelected();
       return (
-        !workspace.isReadOnly() &&
-        focused != null &&
-        isIDeletable(focused) &&
-        focused.isDeletable() &&
-        !workspace.isDragging() &&
-        // Don't delete the block if a field editor is open
-        !getFocusManager().ephemeralFocusTaken()
+        !workspace.options.readOnly &&
+        selected != null &&
+        selected.isDeletable()
       );
     },
-    callback(workspace, e, shortcut, scope) {
+    callback(workspace, e) {
       // Delete or backspace.
       // Stop the browser from going back to the previous page.
       // Do this first to prevent an error in the delete code from resulting in
       // data loss.
       e.preventDefault();
-      const focused = scope.focusedNode;
-      if (focused instanceof BlockSvg) {
-        focused.checkAndDelete();
-      } else if (isIDeletable(focused) && focused.isDeletable()) {
-        eventUtils.setGroup(true);
-        focused.dispose();
-        eventUtils.setGroup(false);
+      // Don't delete while dragging.  Jeez.
+      if (Gesture.inProgress()) {
+        return false;
       }
+      (common.getSelected() as BlockSvg).checkAndDelete();
       return true;
     },
     keyCodes: [KeyCodes.DELETE, KeyCodes.BACKSPACE],
@@ -92,42 +80,8 @@ export function registerDelete() {
   ShortcutRegistry.registry.register(deleteShortcut);
 }
 
-/**
- * Determine if a focusable node can be copied.
- *
- * This will use the isCopyable method if the node implements it, otherwise
- * it will fall back to checking if the node is deletable and draggable not
- * considering the workspace's edit state.
- *
- * @param focused The focused object.
- */
-function isCopyable(focused: IFocusableNode): boolean {
-  if (!isICopyable(focused) || !isIDeletable(focused) || !isDraggable(focused))
-    return false;
-  if (focused.isCopyable) {
-    return focused.isCopyable();
-  } else if (
-    focused instanceof BlockSvg ||
-    focused instanceof RenderedWorkspaceComment
-  ) {
-    return focused.isOwnDeletable() && focused.isOwnMovable();
-  }
-  // This isn't a class Blockly knows about, so fall back to the stricter
-  // checks for deletable and movable.
-  return focused.isDeletable() && focused.isMovable();
-}
-
-/**
- * Determine if a focusable node can be cut.
- *
- * This will check if the node can be both copied and deleted in its current
- * workspace.
- *
- * @param focused The focused object.
- */
-function isCuttable(focused: IFocusableNode): boolean {
-  return isCopyable(focused) && isIDeletable(focused) && focused.isDeletable();
-}
+let copyData: ICopyData | null = null;
+let copyWorkspace: WorkspaceSvg | null = null;
 
 /**
  * Keyboard shortcut to copy a block on ctrl+c, cmd+c, or alt+c.
@@ -136,50 +90,38 @@ export function registerCopy() {
   const ctrlC = ShortcutRegistry.registry.createSerializedKey(KeyCodes.C, [
     KeyCodes.CTRL,
   ]);
+  const altC = ShortcutRegistry.registry.createSerializedKey(KeyCodes.C, [
+    KeyCodes.ALT,
+  ]);
   const metaC = ShortcutRegistry.registry.createSerializedKey(KeyCodes.C, [
     KeyCodes.META,
   ]);
 
   const copyShortcut: KeyboardShortcut = {
     name: names.COPY,
-    preconditionFn(workspace, scope) {
-      const focused = scope.focusedNode;
-
-      const targetWorkspace = workspace.isFlyout
-        ? workspace.targetWorkspace
-        : workspace;
+    preconditionFn(workspace) {
+      const selected = common.getSelected();
       return (
-        !!focused &&
-        !!targetWorkspace &&
-        !targetWorkspace.isDragging() &&
-        !getFocusManager().ephemeralFocusTaken() &&
-        isCopyable(focused)
+        !workspace.options.readOnly &&
+        !Gesture.inProgress() &&
+        selected != null &&
+        selected.isDeletable() &&
+        selected.isMovable() &&
+        isCopyable(selected)
       );
     },
-    callback(workspace, e, shortcut, scope) {
+    callback(workspace, e) {
       // Prevent the default copy behavior, which may beep or otherwise indicate
       // an error due to the lack of a selection.
       e.preventDefault();
-
-      const focused = scope.focusedNode;
-      if (!focused || !isICopyable(focused) || !isCopyable(focused))
-        return false;
-      const targetWorkspace = workspace.isFlyout
-        ? workspace.targetWorkspace
-        : workspace;
-      if (!targetWorkspace) return false;
-
-      if (!focused.workspace.isFlyout) {
-        targetWorkspace.hideChaff();
-      }
-
-      const copyCoords =
-        isDraggable(focused) && focused.workspace == targetWorkspace
-          ? focused.getRelativeToSurfaceXY()
-          : undefined;
-      return !!clipboard.copy(focused, copyCoords);
+      workspace.hideChaff();
+      const selected = common.getSelected();
+      if (!selected || !isCopyable(selected)) return false;
+      copyData = selected.toCopyData();
+      copyWorkspace = workspace;
+      return !!copyData;
     },
-    keyCodes: [ctrlC, metaC],
+    keyCodes: [ctrlC, altC, metaC],
   };
   ShortcutRegistry.registry.register(copyShortcut);
 }
@@ -191,40 +133,36 @@ export function registerCut() {
   const ctrlX = ShortcutRegistry.registry.createSerializedKey(KeyCodes.X, [
     KeyCodes.CTRL,
   ]);
+  const altX = ShortcutRegistry.registry.createSerializedKey(KeyCodes.X, [
+    KeyCodes.ALT,
+  ]);
   const metaX = ShortcutRegistry.registry.createSerializedKey(KeyCodes.X, [
     KeyCodes.META,
   ]);
 
   const cutShortcut: KeyboardShortcut = {
     name: names.CUT,
-    preconditionFn(workspace, scope) {
-      const focused = scope.focusedNode;
+    preconditionFn(workspace) {
+      const selected = common.getSelected();
       return (
-        !!focused &&
-        !workspace.isReadOnly() &&
-        !workspace.isDragging() &&
-        !getFocusManager().ephemeralFocusTaken() &&
-        isCuttable(focused)
+        !workspace.options.readOnly &&
+        !Gesture.inProgress() &&
+        selected != null &&
+        selected instanceof BlockSvg &&
+        selected.isDeletable() &&
+        selected.isMovable() &&
+        !selected.workspace!.isFlyout
       );
     },
-    callback(workspace, e, shortcut, scope) {
-      const focused = scope.focusedNode;
-      if (!focused || !isCuttable(focused) || !isICopyable(focused)) {
-        return false;
-      }
-      const copyCoords = isDraggable(focused)
-        ? focused.getRelativeToSurfaceXY()
-        : undefined;
-      const copyData = clipboard.copy(focused, copyCoords);
-
-      if (focused instanceof BlockSvg) {
-        focused.checkAndDelete();
-      } else if (isIDeletable(focused)) {
-        focused.dispose();
-      }
-      return !!copyData;
+    callback(workspace) {
+      const selected = common.getSelected();
+      if (!selected || !isCopyable(selected)) return false;
+      copyData = selected.toCopyData();
+      copyWorkspace = workspace;
+      (selected as BlockSvg).checkAndDelete();
+      return true;
     },
-    keyCodes: [ctrlX, metaX],
+    keyCodes: [ctrlX, altX, metaX],
   };
 
   ShortcutRegistry.registry.register(cutShortcut);
@@ -237,79 +175,23 @@ export function registerPaste() {
   const ctrlV = ShortcutRegistry.registry.createSerializedKey(KeyCodes.V, [
     KeyCodes.CTRL,
   ]);
+  const altV = ShortcutRegistry.registry.createSerializedKey(KeyCodes.V, [
+    KeyCodes.ALT,
+  ]);
   const metaV = ShortcutRegistry.registry.createSerializedKey(KeyCodes.V, [
     KeyCodes.META,
   ]);
 
   const pasteShortcut: KeyboardShortcut = {
     name: names.PASTE,
-    preconditionFn() {
-      // Regardless of the currently focused workspace, we will only
-      // paste into the last-copied-from workspace.
-      const workspace = clipboard.getLastCopiedWorkspace();
-      // If we don't know where we copied from, we don't know where to paste.
-      // If the workspace isn't rendered (e.g. closed mutator workspace),
-      // we can't paste into it.
-      if (!workspace || !workspace.rendered) return false;
-      const targetWorkspace = workspace.isFlyout
-        ? workspace.targetWorkspace
-        : workspace;
-      return (
-        !!clipboard.getLastCopiedData() &&
-        !!targetWorkspace &&
-        !targetWorkspace.isReadOnly() &&
-        !targetWorkspace.isDragging() &&
-        !getFocusManager().ephemeralFocusTaken()
-      );
+    preconditionFn(workspace) {
+      return !workspace.options.readOnly && !Gesture.inProgress();
     },
-    callback(workspace: WorkspaceSvg, e: Event) {
-      const copyData = clipboard.getLastCopiedData();
-      if (!copyData) return false;
-
-      const copyWorkspace = clipboard.getLastCopiedWorkspace();
-      if (!copyWorkspace) return false;
-
-      const targetWorkspace = copyWorkspace.isFlyout
-        ? copyWorkspace.targetWorkspace
-        : copyWorkspace;
-      if (!targetWorkspace || targetWorkspace.isReadOnly()) return false;
-
-      if (e instanceof PointerEvent) {
-        // The event that triggers a shortcut would conventionally be a KeyboardEvent.
-        // However, it may be a PointerEvent if a context menu item was used as a
-        // wrapper for this callback, in which case the new block(s) should be pasted
-        // at the mouse coordinates where the menu was opened, and this PointerEvent
-        // is where the menu was opened.
-        const mouseCoords = svgMath.screenToWsCoordinates(
-          targetWorkspace,
-          new Coordinate(e.clientX, e.clientY),
-        );
-        return !!clipboard.paste(copyData, targetWorkspace, mouseCoords);
-      }
-
-      const copyCoords = clipboard.getLastCopiedLocation();
-      if (!copyCoords) {
-        // If we don't have location data about the original copyable, let the
-        // paster determine position.
-        return !!clipboard.paste(copyData, targetWorkspace);
-      }
-
-      const {left, top, width, height} = targetWorkspace
-        .getMetricsManager()
-        .getViewMetrics(true);
-      const viewportRect = new Rect(top, top + height, left, left + width);
-
-      if (viewportRect.contains(copyCoords.x, copyCoords.y)) {
-        // If the original copyable is inside the viewport, let the paster
-        // determine position.
-        return !!clipboard.paste(copyData, targetWorkspace);
-      }
-
-      // Otherwise, paste in the middle of the viewport.
-      const centerCoords = new Coordinate(left + width / 2, top + height / 2);
-      return !!clipboard.paste(copyData, targetWorkspace, centerCoords);
+    callback() {
+      if (!copyData || !copyWorkspace) return false;
+      return !!clipboard.paste(copyData, copyWorkspace);
     },
-    keyCodes: [ctrlV, metaV],
+    keyCodes: [ctrlV, altV, metaV],
   };
 
   ShortcutRegistry.registry.register(pasteShortcut);
@@ -322,6 +204,9 @@ export function registerUndo() {
   const ctrlZ = ShortcutRegistry.registry.createSerializedKey(KeyCodes.Z, [
     KeyCodes.CTRL,
   ]);
+  const altZ = ShortcutRegistry.registry.createSerializedKey(KeyCodes.Z, [
+    KeyCodes.ALT,
+  ]);
   const metaZ = ShortcutRegistry.registry.createSerializedKey(KeyCodes.Z, [
     KeyCodes.META,
   ]);
@@ -329,20 +214,15 @@ export function registerUndo() {
   const undoShortcut: KeyboardShortcut = {
     name: names.UNDO,
     preconditionFn(workspace) {
-      return (
-        !workspace.isReadOnly() &&
-        !workspace.isDragging() &&
-        !getFocusManager().ephemeralFocusTaken()
-      );
+      return !workspace.options.readOnly && !Gesture.inProgress();
     },
-    callback(workspace, e) {
+    callback(workspace) {
       // 'z' for undo 'Z' is for redo.
       (workspace as WorkspaceSvg).hideChaff();
       workspace.undo(false);
-      e.preventDefault();
       return true;
     },
-    keyCodes: [ctrlZ, metaZ],
+    keyCodes: [ctrlZ, altZ, metaZ],
   };
   ShortcutRegistry.registry.register(undoShortcut);
 }
@@ -353,12 +233,16 @@ export function registerUndo() {
  */
 export function registerRedo() {
   const ctrlShiftZ = ShortcutRegistry.registry.createSerializedKey(KeyCodes.Z, [
-    KeyCodes.CTRL,
     KeyCodes.SHIFT,
+    KeyCodes.CTRL,
+  ]);
+  const altShiftZ = ShortcutRegistry.registry.createSerializedKey(KeyCodes.Z, [
+    KeyCodes.SHIFT,
+    KeyCodes.ALT,
   ]);
   const metaShiftZ = ShortcutRegistry.registry.createSerializedKey(KeyCodes.Z, [
-    KeyCodes.META,
     KeyCodes.SHIFT,
+    KeyCodes.META,
   ]);
   // Ctrl-y is redo in Windows.  Command-y is never valid on Macs.
   const ctrlY = ShortcutRegistry.registry.createSerializedKey(KeyCodes.Y, [
@@ -368,20 +252,15 @@ export function registerRedo() {
   const redoShortcut: KeyboardShortcut = {
     name: names.REDO,
     preconditionFn(workspace) {
-      return (
-        !workspace.isDragging() &&
-        !workspace.isReadOnly() &&
-        !getFocusManager().ephemeralFocusTaken()
-      );
+      return !Gesture.inProgress() && !workspace.options.readOnly;
     },
-    callback(workspace, e) {
+    callback(workspace) {
       // 'z' for undo 'Z' is for redo.
       (workspace as WorkspaceSvg).hideChaff();
       workspace.undo(true);
-      e.preventDefault();
       return true;
     },
-    keyCodes: [ctrlShiftZ, metaShiftZ, ctrlY],
+    keyCodes: [ctrlShiftZ, altShiftZ, metaShiftZ, ctrlY],
   };
   ShortcutRegistry.registry.register(redoShortcut);
 }

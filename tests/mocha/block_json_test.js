@@ -5,7 +5,6 @@
  */
 
 import {Align} from '../../build/src/core/inputs/align.js';
-import {assert} from '../../node_modules/chai/chai.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
@@ -21,25 +20,25 @@ suite('Block JSON initialization', function () {
     sharedTestTeardown.call(this);
   });
 
-  suite('validateTokens', function () {
+  suite('validateTokens_', function () {
     setup(function () {
       this.assertError = function (tokens, count, error) {
         const block = {
           type: 'test',
-          validateTokens: Blockly.Block.prototype.validateTokens,
+          validateTokens_: Blockly.Block.prototype.validateTokens_,
         };
-        assert.throws(function () {
-          block.validateTokens(tokens, count);
+        chai.assert.throws(function () {
+          block.validateTokens_(tokens, count);
         }, error);
       };
 
       this.assertNoError = function (tokens, count) {
         const block = {
           type: 'test',
-          validateTokens: Blockly.Block.prototype.validateTokens,
+          validateTokens_: Blockly.Block.prototype.validateTokens_,
         };
-        assert.doesNotThrow(function () {
-          block.validateTokens(tokens, count);
+        chai.assert.doesNotThrow(function () {
+          block.validateTokens_(tokens, count);
         });
       };
     });
@@ -97,17 +96,17 @@ suite('Block JSON initialization', function () {
     });
   });
 
-  suite('interpolateArguments', function () {
+  suite('interpolateArguments_', function () {
     setup(function () {
       this.assertInterpolation = function (tokens, args, lastAlign, elements) {
         const block = {
           type: 'test',
-          interpolateArguments: Blockly.Block.prototype.interpolateArguments,
-          stringToFieldJson: Blockly.Block.prototype.stringToFieldJson,
-          isInputKeyword: Blockly.Block.prototype.isInputKeyword,
+          interpolateArguments_: Blockly.Block.prototype.interpolateArguments_,
+          stringToFieldJson_: Blockly.Block.prototype.stringToFieldJson_,
+          isInputKeyword_: Blockly.Block.prototype.isInputKeyword_,
         };
-        assert.deepEqual(
-          block.interpolateArguments(tokens, args, lastAlign),
+        chai.assert.deepEqual(
+          block.interpolateArguments_(tokens, args, lastAlign),
           elements,
         );
       };
@@ -381,7 +380,7 @@ suite('Block JSON initialization', function () {
     });
   });
 
-  suite('fieldFromJson', function () {
+  suite('fieldFromJson_', function () {
     setup(function () {
       this.stub = sinon
         .stub(Blockly.fieldRegistry.TEST_ONLY, 'fromJsonInternal')
@@ -403,10 +402,10 @@ suite('Block JSON initialization', function () {
       this.assertField = function (json, expectedType) {
         const block = {
           type: 'test',
-          fieldFromJson: Blockly.Block.prototype.fieldFromJson,
-          stringToFieldJson: Blockly.Block.prototype.stringToFieldJson,
+          fieldFromJson_: Blockly.Block.prototype.fieldFromJson_,
+          stringToFieldJson_: Blockly.Block.prototype.stringToFieldJson_,
         };
-        assert.strictEqual(block.fieldFromJson(json), expectedType);
+        chai.assert.strictEqual(block.fieldFromJson_(json), expectedType);
       };
     });
 
@@ -563,7 +562,7 @@ suite('Block JSON initialization', function () {
     });
   });
 
-  suite('inputFromJson', function () {
+  suite('inputFromJson_', function () {
     setup(function () {
       this.assertInput = function (json, type, check, align) {
         const block = this.workspace.newBlock('test_basic_empty');
@@ -571,37 +570,37 @@ suite('Block JSON initialization', function () {
         sinon.spy(block, 'appendValueInput');
         sinon.spy(block, 'appendStatementInput');
 
-        const input = block.inputFromJson(json);
+        const input = block.inputFromJson_(json);
         switch (type) {
           case 'input_dummy':
-            assert.isTrue(
+            chai.assert.isTrue(
               block.appendDummyInput.calledOnce,
               'Expected a dummy input to be created.',
             );
             break;
           case 'input_value':
-            assert.isTrue(
+            chai.assert.isTrue(
               block.appendValueInput.calledOnce,
               'Expected a value input to be created.',
             );
             break;
           case 'input_statement':
-            assert.isTrue(
+            chai.assert.isTrue(
               block.appendStatementInput.calledOnce,
               'Expected a statement input to be created.',
             );
             break;
           default:
-            assert.isNull(input, 'Expected input to be null');
-            assert.isTrue(
+            chai.assert.isNull(input, 'Expected input to be null');
+            chai.assert.isTrue(
               block.appendDummyInput.notCalled,
               'Expected no input to be created',
             );
-            assert.isTrue(
+            chai.assert.isTrue(
               block.appendValueInput.notCalled,
               'Expected no input to be created',
             );
-            assert.isTrue(
+            chai.assert.isTrue(
               block.appendStatementInput.notCalled,
               'Expected no input to be created',
             );
@@ -609,13 +608,13 @@ suite('Block JSON initialization', function () {
         }
         if (check) {
           if (Array.isArray(check)) {
-            assert.deepEqual(check, input.connection.getCheck());
+            chai.assert.deepEqual(check, input.connection.getCheck());
           } else {
-            assert.deepEqual([check], input.connection.getCheck());
+            chai.assert.deepEqual([check], input.connection.getCheck());
           }
         }
         if (align !== undefined) {
-          assert.equal(align, input.align);
+          chai.assert.equal(align, input.align);
         }
       };
     });
@@ -667,8 +666,8 @@ suite('Block JSON initialization', function () {
           CustomInput,
         );
         const block = this.workspace.newBlock('test_basic_empty');
-        block.inputFromJson({'type': 'custom'});
-        assert.instanceOf(
+        block.inputFromJson_({'type': 'custom'});
+        chai.assert.instanceOf(
           block.inputList[0],
           CustomInput,
           'Expected the registered input to be constructed',

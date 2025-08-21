@@ -10,10 +10,10 @@
 
 // Former goog.module ID: Blockly.Lua.lists
 
-import type {CreateWithBlock} from '../../blocks/lists.js';
 import type {Block} from '../../core/block.js';
-import {NameType} from '../../core/names.js';
+import type {CreateWithBlock} from '../../blocks/lists.js';
 import type {LuaGenerator} from './lua_generator.js';
+import {NameType} from '../../core/names.js';
 import {Order} from './lua_generator.js';
 
 export function lists_create_empty(
@@ -33,7 +33,7 @@ export function lists_create_with(
   const elements = new Array(createWithBlock.itemCount_);
   for (let i = 0; i < createWithBlock.itemCount_; i++) {
     elements[i] =
-      generator.valueToCode(createWithBlock, 'ADD' + i, Order.NONE) || 'nil';
+      generator.valueToCode(createWithBlock, 'ADD' + i, Order.NONE) || 'None';
   }
   const code = '{' + elements.join(', ') + '}';
   return [code, Order.HIGH];
@@ -56,7 +56,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(item, count)
 end
   `,
   );
-  const element = generator.valueToCode(block, 'ITEM', Order.NONE) || 'nil';
+  const element = generator.valueToCode(block, 'ITEM', Order.NONE) || 'None';
   const repeatCount = generator.valueToCode(block, 'NUM', Order.NONE) || '0';
   const code = functionName + '(' + element + ', ' + repeatCount + ')';
   return [code, Order.HIGH];
@@ -258,7 +258,7 @@ export function lists_setIndex(block: Block, generator: LuaGenerator): string {
   const mode = block.getFieldValue('MODE') || 'SET';
   const where = block.getFieldValue('WHERE') || 'FROM_START';
   const at = generator.valueToCode(block, 'AT', Order.ADDITIVE) || '1';
-  const value = generator.valueToCode(block, 'TO', Order.NONE) || 'Nil';
+  const value = generator.valueToCode(block, 'TO', Order.NONE) || 'None';
 
   let code = '';
   // If `list` would be evaluated more than once (which is the case for LAST,

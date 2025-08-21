@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../node_modules/chai/chai.js';
+import {assertWarnings} from './test_helpers/warnings.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
 } from './test_helpers/setup_teardown.js';
-import {assertWarnings} from './test_helpers/warnings.js';
 
 suite('Registry', function () {
   const TestClass = function () {};
@@ -34,35 +33,26 @@ suite('Registry', function () {
     });
 
     test('Empty String Key', function () {
-      assert.throws(function () {
+      chai.assert.throws(function () {
         Blockly.registry.register('test', '', TestClass);
       }, 'Invalid name');
     });
 
     test('Class as Key', function () {
-      assert.throws(function () {
+      chai.assert.throws(function () {
         Blockly.registry.register('test', TestClass, '');
       }, 'Invalid name');
     });
 
     test('Overwrite a Key', function () {
       Blockly.registry.register('test', 'test_name', TestClass);
-      assert.throws(function () {
-        // Registers a different object under the same name
-        Blockly.registry.register('test', 'test_name', {});
-      }, 'already registered');
-    });
-
-    test('Register a Duplicate Item', function () {
-      Blockly.registry.register('test', 'test_name', TestClass);
-      assert.doesNotThrow(function () {
-        // Registering the same object under the same name is allowed
+      chai.assert.throws(function () {
         Blockly.registry.register('test', 'test_name', TestClass);
       }, 'already registered');
     });
 
     test('Null Value', function () {
-      assert.throws(function () {
+      chai.assert.throws(function () {
         Blockly.registry.register('test', 'field_custom_test', null);
       }, 'Can not register a null value');
     });
@@ -74,26 +64,26 @@ suite('Registry', function () {
     });
 
     test('Has', function () {
-      assert.isTrue(Blockly.registry.hasItem('test', 'test_name'));
+      chai.assert.isTrue(Blockly.registry.hasItem('test', 'test_name'));
     });
 
     suite('Does not have', function () {
       test('Type', function () {
-        assert.isFalse(Blockly.registry.hasItem('bad_type', 'test_name'));
+        chai.assert.isFalse(Blockly.registry.hasItem('bad_type', 'test_name'));
       });
 
       test('Name', function () {
-        assert.isFalse(Blockly.registry.hasItem('test', 'bad_name'));
+        chai.assert.isFalse(Blockly.registry.hasItem('test', 'bad_name'));
       });
     });
 
     suite('Case', function () {
       test('Caseless type', function () {
-        assert.isTrue(Blockly.registry.hasItem('TEST', 'test_name'));
+        chai.assert.isTrue(Blockly.registry.hasItem('TEST', 'test_name'));
       });
 
       test('Caseless name', function () {
-        assert.isTrue(Blockly.registry.hasItem('test', 'TEST_NAME'));
+        chai.assert.isTrue(Blockly.registry.hasItem('test', 'TEST_NAME'));
       });
     });
   });
@@ -104,24 +94,26 @@ suite('Registry', function () {
     });
 
     test('Has', function () {
-      assert.isNotNull(Blockly.registry.getClass('test', 'test_name'));
+      chai.assert.isNotNull(Blockly.registry.getClass('test', 'test_name'));
     });
 
     suite('Does not have', function () {
       test('Type', function () {
         assertWarnings(() => {
-          assert.isNull(Blockly.registry.getClass('bad_type', 'test_name'));
+          chai.assert.isNull(
+            Blockly.registry.getClass('bad_type', 'test_name'),
+          );
         }, /Unable to find/);
       });
 
       test('Name', function () {
         assertWarnings(() => {
-          assert.isNull(Blockly.registry.getClass('test', 'bad_name'));
+          chai.assert.isNull(Blockly.registry.getClass('test', 'bad_name'));
         }, /Unable to find/);
       });
 
       test('Throw if missing', function () {
-        assert.throws(function () {
+        chai.assert.throws(function () {
           Blockly.registry.getClass('test', 'bad_name', true);
         });
       });
@@ -129,11 +121,11 @@ suite('Registry', function () {
 
     suite('Case', function () {
       test('Caseless type', function () {
-        assert.isNotNull(Blockly.registry.getClass('TEST', 'test_name'));
+        chai.assert.isNotNull(Blockly.registry.getClass('TEST', 'test_name'));
       });
 
       test('Caseless name', function () {
-        assert.isNotNull(Blockly.registry.getClass('test', 'TEST_NAME'));
+        chai.assert.isNotNull(Blockly.registry.getClass('test', 'TEST_NAME'));
       });
     });
   });
@@ -144,24 +136,26 @@ suite('Registry', function () {
     });
 
     test('Has', function () {
-      assert.isNotNull(Blockly.registry.getObject('test', 'test_name'));
+      chai.assert.isNotNull(Blockly.registry.getObject('test', 'test_name'));
     });
 
     suite('Does not have', function () {
       test('Type', function () {
         assertWarnings(() => {
-          assert.isNull(Blockly.registry.getObject('bad_type', 'test_name'));
+          chai.assert.isNull(
+            Blockly.registry.getObject('bad_type', 'test_name'),
+          );
         }, /Unable to find/);
       });
 
       test('Name', function () {
         assertWarnings(() => {
-          assert.isNull(Blockly.registry.getObject('test', 'bad_name'));
+          chai.assert.isNull(Blockly.registry.getObject('test', 'bad_name'));
         }, /Unable to find/);
       });
 
       test('Throw if missing', function () {
-        assert.throws(function () {
+        chai.assert.throws(function () {
           Blockly.registry.getObject('test', 'bad_name', true);
         });
       });
@@ -169,11 +163,11 @@ suite('Registry', function () {
 
     suite('Case', function () {
       test('Caseless type', function () {
-        assert.isNotNull(Blockly.registry.getObject('TEST', 'test_name'));
+        chai.assert.isNotNull(Blockly.registry.getObject('TEST', 'test_name'));
       });
 
       test('Caseless name', function () {
-        assert.isNotNull(Blockly.registry.getObject('test', 'TEST_NAME'));
+        chai.assert.isNotNull(Blockly.registry.getObject('test', 'TEST_NAME'));
       });
     });
   });
@@ -189,27 +183,27 @@ suite('Registry', function () {
     });
 
     test('Has', function () {
-      assert.isNotNull(Blockly.registry.getAllItems('test'));
+      chai.assert.isNotNull(Blockly.registry.getAllItems('test'));
     });
 
     test('Does not have', function () {
       assertWarnings(() => {
-        assert.isNull(Blockly.registry.getAllItems('bad_type'));
+        chai.assert.isNull(Blockly.registry.getAllItems('bad_type'));
       }, /Unable to find/);
     });
 
     test('Throw if missing', function () {
-      assert.throws(function () {
+      chai.assert.throws(function () {
         Blockly.registry.getAllItems('bad_type', false, true);
       });
     });
 
     test('Ignore type case', function () {
-      assert.isNotNull(Blockly.registry.getAllItems('TEST'));
+      chai.assert.isNotNull(Blockly.registry.getAllItems('TEST'));
     });
 
     test('Respect name case', function () {
-      assert.deepEqual(Blockly.registry.getAllItems('test', true), {
+      chai.assert.deepEqual(Blockly.registry.getAllItems('test', true), {
         'test_name': {},
         'casedNAME': {},
       });
@@ -217,7 +211,7 @@ suite('Registry', function () {
 
     test('Respect overwriting name case', function () {
       Blockly.registry.register('test', 'CASEDname', {}, true);
-      assert.deepEqual(Blockly.registry.getAllItems('test', true), {
+      chai.assert.deepEqual(Blockly.registry.getAllItems('test', true), {
         'test_name': {},
         'CASEDname': {},
       });
@@ -248,7 +242,7 @@ suite('Registry', function () {
         'test',
         this.options,
       );
-      assert.instanceOf(new testClass(), TestClass);
+      chai.assert.instanceOf(new testClass(), TestClass);
     });
 
     test('Simple - Plugin class given', function () {
@@ -257,7 +251,7 @@ suite('Registry', function () {
         'test',
         this.options,
       );
-      assert.instanceOf(new testClass(), TestClass);
+      chai.assert.instanceOf(new testClass(), TestClass);
     });
 
     test('No Plugin Name Given', function () {
@@ -266,7 +260,7 @@ suite('Registry', function () {
         'test',
         this.options,
       );
-      assert.instanceOf(new testClass(), this.defaultClass);
+      chai.assert.instanceOf(new testClass(), this.defaultClass);
     });
 
     test('Incorrect Plugin Name', function () {
@@ -275,7 +269,7 @@ suite('Registry', function () {
       assertWarnings(() => {
         testClass = Blockly.registry.getClassFromOptions('test', this.options);
       }, /Unable to find/);
-      assert.isNull(testClass);
+      chai.assert.isNull(testClass);
     });
   });
 });

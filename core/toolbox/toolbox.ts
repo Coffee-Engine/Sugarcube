@@ -12,41 +12,36 @@
 // Former goog.module ID: Blockly.Toolbox
 
 // Unused import preserved for side-effects. Remove if unneeded.
+import '../events/events_toolbox_item_select.js';
+
 import {BlockSvg} from '../block_svg.js';
+import type {BlocklyOptions} from '../blockly_options.js';
 import * as browserEvents from '../browser_events.js';
 import * as common from '../common.js';
 import {ComponentManager} from '../component_manager.js';
 import * as Css from '../css.js';
 import {DeleteArea} from '../delete_area.js';
-import '../events/events_toolbox_item_select.js';
-import {EventType} from '../events/type.js';
 import * as eventUtils from '../events/utils.js';
-import {getFocusManager} from '../focus_manager.js';
-import {
-  isAutoHideable,
-  type IAutoHideable,
-} from '../interfaces/i_autohideable.js';
+import type {IAutoHideable} from '../interfaces/i_autohideable.js';
 import type {ICollapsibleToolboxItem} from '../interfaces/i_collapsible_toolbox_item.js';
-import {isDeletable} from '../interfaces/i_deletable.js';
 import type {IDraggable} from '../interfaces/i_draggable.js';
 import type {IFlyout} from '../interfaces/i_flyout.js';
-import type {IFocusableNode} from '../interfaces/i_focusable_node.js';
-import type {IFocusableTree} from '../interfaces/i_focusable_tree.js';
 import type {IKeyboardAccessible} from '../interfaces/i_keyboard_accessible.js';
 import type {ISelectableToolboxItem} from '../interfaces/i_selectable_toolbox_item.js';
 import {isSelectableToolboxItem} from '../interfaces/i_selectable_toolbox_item.js';
 import type {IStyleable} from '../interfaces/i_styleable.js';
 import type {IToolbox} from '../interfaces/i_toolbox.js';
 import type {IToolboxItem} from '../interfaces/i_toolbox_item.js';
+import {Options} from '../options.js';
 import * as registry from '../registry.js';
 import type {KeyboardShortcut} from '../shortcut_registry.js';
 import * as Touch from '../touch.js';
 import * as aria from '../utils/aria.js';
 import * as dom from '../utils/dom.js';
-import * as idGenerator from '../utils/idgenerator.js';
 import {Rect} from '../utils/rect.js';
 import * as toolbox from '../utils/toolbox.js';
 import type {WorkspaceSvg} from '../workspace_svg.js';
+
 import type {ToolboxCategory} from './category.js';
 import {CollapsibleToolboxCategory} from './collapsible_category.js';
 
@@ -56,12 +51,7 @@ import {CollapsibleToolboxCategory} from './collapsible_category.js';
  */
 export class Toolbox
   extends DeleteArea
-  implements
-    IAutoHideable,
-    IKeyboardAccessible,
-    IStyleable,
-    IToolbox,
-    IFocusableNode
+  implements IAutoHideable, IKeyboardAccessible, IStyleable, IToolbox
 {
   /**
    * The unique ID for this component that is used to register with the
@@ -69,7 +59,7 @@ export class Toolbox
    */
   override id = 'toolbox';
   protected toolboxDef_: toolbox.ToolboxInfo;
-  private readonly horizontalLayout: boolean;
+  private readonly horizontalLayout_: boolean;
 
   /** The HTML container for the toolbox. */
   HtmlDiv: HTMLDivElement | null = null;
@@ -80,6 +70,9 @@ export class Toolbox
   /** Whether the Toolbox is visible. */
   protected isVisible_ = false;
 
+  /** The list of items in the toolbox. */
+  protected contents_: IToolboxItem[] = [];
+
   /** The width of the toolbox. */
   protected width_ = 0;
 
@@ -88,11 +81,8 @@ export class Toolbox
   RTL: boolean;
 
   /** The flyout for the toolbox. */
-  private flyout: IFlyout | null = null;
-
-  /** Map from ID to the corresponding toolbox item. */
-  protected contents = new Map<string, IToolboxItem>();
-
+  private flyout_: IFlyout | null = null;
+  protected contentMap_: {[key: string]: IToolboxItem};
   toolboxPosition: toolbox.Position;
 
   /** The currently selected item. */
@@ -123,10 +113,13 @@ export class Toolbox
     };
 
     /** Whether the toolbox should be laid out horizontally. */
-    this.horizontalLayout = workspace.options.horizontalLayout;
+    this.horizontalLayout_ = workspace.options.horizontalLayout;
 
     /** Is RTL vs LTR. */
     this.RTL = workspace.options.RTL;
+
+    /** A map from toolbox item IDs to toolbox items. */
+    this.contentMap_ = Object.create(null);
 
     /** Position of the toolbox and flyout relative to the workspace. */
     this.toolboxPosition = workspace.options.toolboxPosition;
@@ -147,14 +140,12 @@ export class Toolbox
     const workspace = this.workspace_;
     const svg = workspace.getParentSvg();
 
-    this.flyout = this.createFlyout_();
+    this.flyout_ = this.createFlyout_();
 
     this.HtmlDiv = this.createDom_(this.workspace_);
-    const flyoutDom = this.flyout.createDom('svg');
-    dom.addClass(flyoutDom, 'blocklyToolboxFlyout');
-    dom.insertAfter(flyoutDom, svg);
+    dom.insertAfter(this.flyout_.createDom('svg'), svg);
     this.setVisible(true);
-    this.flyout.init(workspace);
+    this.flyout_.init(workspace);
 
     this.render(this.toolboxDef_);
     const themeManager = workspace.getThemeManager();
@@ -166,14 +157,13 @@ export class Toolbox
     themeManager.subscribe(this.HtmlDiv, 'toolboxForegroundColour', 'color');
     this.workspace_.getComponentManager().addComponent({
       component: this,
-      weight: ComponentManager.ComponentWeight.TOOLBOX_WEIGHT,
+      weight: 1,
       capabilities: [
         ComponentManager.Capability.AUTOHIDEABLE,
         ComponentManager.Capability.DELETE_AREA,
         ComponentManager.Capability.DRAG_TARGET,
       ],
     });
-    getFocusManager().registerTree(this, true);
   }
 
   /**
@@ -186,9 +176,9 @@ export class Toolbox
     const svg = workspace.getParentSvg();
 
     const container = this.createContainer_();
-    container.id = idGenerator.getNextUniqueId();
 
     this.contentsDiv_ = this.createContentsContainer_();
+    this.contentsDiv_.tabIndex = 0;
     aria.setRole(this.contentsDiv_, aria.Role.TREE);
     container.appendChild(this.contentsDiv_);
 
@@ -206,7 +196,8 @@ export class Toolbox
   protected createContainer_(): HTMLDivElement {
     const toolboxContainer = document.createElement('div');
     toolboxContainer.setAttribute('layout', this.isHorizontal() ? 'h' : 'v');
-    dom.addClass(toolboxContainer, 'blocklyToolbox');
+    dom.addClass(toolboxContainer, 'blocklyToolboxDiv');
+    dom.addClass(toolboxContainer, 'blocklyNonSelectable');
     toolboxContainer.setAttribute('dir', this.RTL ? 'RTL' : 'LTR');
     return toolboxContainer;
   }
@@ -218,7 +209,7 @@ export class Toolbox
    */
   protected createContentsContainer_(): HTMLDivElement {
     const contentsContainer = document.createElement('div');
-    dom.addClass(contentsContainer, 'blocklyToolboxCategoryGroup');
+    dom.addClass(contentsContainer, 'blocklyToolboxContents');
     if (this.isHorizontal()) {
       contentsContainer.style.flexDirection = 'row';
     }
@@ -290,16 +281,16 @@ export class Toolbox
     let handled = false;
     switch (e.key) {
       case 'ArrowDown':
-        handled = this.selectNext();
+        handled = this.selectNext_();
         break;
       case 'ArrowUp':
-        handled = this.selectPrevious();
+        handled = this.selectPrevious_();
         break;
       case 'ArrowLeft':
-        handled = this.selectParent();
+        handled = this.selectParent_();
         break;
       case 'ArrowRight':
-        handled = this.selectChild();
+        handled = this.selectChild_();
         break;
       case 'Enter':
       case ' ':
@@ -335,7 +326,18 @@ export class Toolbox
    */
   protected createFlyout_(): IFlyout {
     const workspace = this.workspace_;
-    const workspaceOptions = workspace.copyOptionsForFlyout();
+    // TODO (#4247): Look into adding a makeFlyout method to Blockly Options.
+    const workspaceOptions = new Options({
+      'parentWorkspace': workspace,
+      'rtl': workspace.RTL,
+      'oneBasedIndex': workspace.options.oneBasedIndex,
+      'horizontalLayout': workspace.horizontalLayout,
+      'renderer': workspace.options.renderer,
+      'rendererOverrides': workspace.options.rendererOverrides,
+      'move': {
+        'scrollbars': true,
+      },
+    } as BlocklyOptions);
     // Options takes in either 'end' or 'start'. This has already been parsed to
     // be either 0 or 1, so set it after.
     workspaceOptions.toolboxPosition = workspace.options.toolboxPosition;
@@ -364,8 +366,14 @@ export class Toolbox
    */
   render(toolboxDef: toolbox.ToolboxInfo) {
     this.toolboxDef_ = toolboxDef;
-    this.contents.forEach((item) => item.dispose());
-    this.contents.clear();
+    for (let i = 0; i < this.contents_.length; i++) {
+      const toolboxItem = this.contents_[i];
+      if (toolboxItem) {
+        toolboxItem.dispose();
+      }
+    }
+    this.contents_ = [];
+    this.contentMap_ = Object.create(null);
     this.renderContents_(toolboxDef['contents']);
     this.position();
     this.handleToolboxItemResize();
@@ -383,7 +391,7 @@ export class Toolbox
     const fragment = document.createDocumentFragment();
     for (let i = 0; i < toolboxDef.length; i++) {
       const toolboxItemDef = toolboxDef[i];
-      this.createToolboxItem(toolboxItemDef, fragment);
+      this.createToolboxItem_(toolboxItemDef, fragment);
     }
     this.contentsDiv_!.appendChild(fragment);
   }
@@ -395,7 +403,7 @@ export class Toolbox
    *     the toolbox.
    * @param fragment The document fragment to add the child toolbox elements to.
    */
-  private createToolboxItem(
+  private createToolboxItem_(
     toolboxItemDef: toolbox.ToolboxItemInfo,
     fragment: DocumentFragment,
   ) {
@@ -436,7 +444,8 @@ export class Toolbox
    * @param toolboxItem The item in the toolbox.
    */
   protected addToolboxItem_(toolboxItem: IToolboxItem) {
-    this.contents.set(toolboxItem.getId(), toolboxItem);
+    this.contents_.push(toolboxItem);
+    this.contentMap_[toolboxItem.getId()] = toolboxItem;
     if (toolboxItem.isCollapsible()) {
       const collapsibleItem = toolboxItem as ICollapsibleToolboxItem;
       const childToolboxItems = collapsibleItem.getChildToolboxItems();
@@ -453,7 +462,7 @@ export class Toolbox
    * @returns The list of items in the toolbox.
    */
   getToolboxItems(): IToolboxItem[] {
-    return [...this.contents.values()];
+    return this.contents_;
   }
 
   /**
@@ -523,15 +532,17 @@ export class Toolbox
    * before onDragEnter/onDragOver/onDragExit.
    *
    * @param element The block or bubble currently being dragged.
+   * @param _couldConnect Whether the element could could connect to another.
    * @returns Whether the element provided would be deleted if dropped on this
    *     area.
    */
-  override wouldDelete(element: IDraggable): boolean {
+  override wouldDelete(element: IDraggable, _couldConnect: boolean): boolean {
     if (element instanceof BlockSvg) {
       const block = element;
+      // Prefer dragging to the toolbox over connecting to other blocks.
       this.updateWouldDelete_(!block.getParent() && block.isDeletable());
     } else {
-      this.updateWouldDelete_(isDeletable(element) && element.isDeletable());
+      this.updateWouldDelete_(element.isDeletable());
     }
     return this.wouldDelete_;
   }
@@ -608,7 +619,7 @@ export class Toolbox
    * @returns The toolbox item with the given ID, or null if no item exists.
    */
   getToolboxItemById(id: string): IToolboxItem | null {
-    return this.contents.get(id) || null;
+    return this.contentMap_[id] || null;
   }
 
   /**
@@ -635,7 +646,7 @@ export class Toolbox
    * @returns The toolbox flyout.
    */
   getFlyout(): IFlyout | null {
-    return this.flyout;
+    return this.flyout_;
   }
 
   /**
@@ -673,7 +684,7 @@ export class Toolbox
    *     vertical.
    */
   isHorizontal(): boolean {
-    return this.horizontalLayout;
+    return this.horizontalLayout_;
   }
 
   /**
@@ -688,7 +699,7 @@ export class Toolbox
       return;
     }
 
-    if (this.horizontalLayout) {
+    if (this.horizontalLayout_) {
       toolboxDiv.style.left = '0';
       toolboxDiv.style.height = 'auto';
       toolboxDiv.style.width = '100%';
@@ -711,7 +722,7 @@ export class Toolbox
       this.width_ = toolboxDiv.offsetWidth;
       this.height_ = workspaceMetrics.viewHeight;
     }
-    this.flyout!.position();
+    this.flyout_!.position();
   }
 
   /**
@@ -724,18 +735,13 @@ export class Toolbox
     // relative to the new absolute edge (ie toolbox edge).
     const workspace = this.workspace_;
     const rect = this.HtmlDiv!.getBoundingClientRect();
-    const flyout = this.getFlyout();
     const newX =
       this.toolboxPosition === toolbox.Position.LEFT
-        ? workspace.scrollX +
-          rect.width +
-          (flyout?.isVisible() ? flyout.getWidth() : 0)
+        ? workspace.scrollX + rect.width
         : workspace.scrollX;
     const newY =
       this.toolboxPosition === toolbox.Position.TOP
-        ? workspace.scrollY +
-          rect.height +
-          (flyout?.isVisible() ? flyout.getHeight() : 0)
+        ? workspace.scrollY + rect.height
         : workspace.scrollY;
     workspace.translate(newX, newY);
 
@@ -755,13 +761,14 @@ export class Toolbox
    * @internal
    */
   refreshTheme() {
-    this.contents.forEach((child) => {
+    for (let i = 0; i < this.contents_.length; i++) {
+      const child = this.contents_[i];
       // TODO(#6097): Fix types or add refreshTheme to IToolboxItem.
       const childAsCategory = child as ToolboxCategory;
       if (childAsCategory.refreshTheme) {
         childAsCategory.refreshTheme();
       }
-    });
+    }
   }
 
   /**
@@ -775,7 +782,7 @@ export class Toolbox
       this.selectedItem_.isSelectable() &&
       this.selectedItem_.getContents().length
     ) {
-      this.flyout!.show(this.selectedItem_.getContents());
+      this.flyout_!.show(this.selectedItem_.getContents());
     }
   }
 
@@ -803,7 +810,7 @@ export class Toolbox
    *     Flyouts should not be closed if this is true.
    */
   autoHide(onlyClosePopups: boolean) {
-    if (!onlyClosePopups && this.flyout && this.flyout.autoClose) {
+    if (!onlyClosePopups && this.flyout_ && this.flyout_.autoClose) {
       this.clearSelection();
     }
   }
@@ -833,7 +840,7 @@ export class Toolbox
     }
 
     this.updateFlyout_(oldItem, newItem);
-    this.fireSelectEvent(oldItem, newItem);
+    this.fireSelectEvent_(oldItem, newItem);
   }
 
   /**
@@ -912,9 +919,11 @@ export class Toolbox
    * @param position The position of the item to select.
    */
   selectItemByPosition(position: number) {
-    const item = this.getToolboxItems()[position];
-    if (item) {
-      this.setSelectedItem(item);
+    if (position > -1 && position < this.contents_.length) {
+      const item = this.contents_[position];
+      if (item.isSelectable()) {
+        this.setSelectedItem(item);
+      }
     }
   }
 
@@ -933,10 +942,10 @@ export class Toolbox
       (oldItem === newItem && !newItem.isCollapsible()) ||
       !newItem.getContents().length
     ) {
-      this.flyout!.hide();
+      this.flyout_!.hide();
     } else {
-      this.flyout!.show(newItem.getContents());
-      this.flyout!.scrollToStart();
+      this.flyout_!.show(newItem.getContents());
+      this.flyout_!.scrollToStart();
     }
   }
 
@@ -946,7 +955,7 @@ export class Toolbox
    * @param oldItem The previously selected toolbox item.
    * @param newItem The newly selected toolbox item.
    */
-  private fireSelectEvent(
+  private fireSelectEvent_(
     oldItem: ISelectableToolboxItem | null,
     newItem: ISelectableToolboxItem | null,
   ) {
@@ -956,7 +965,7 @@ export class Toolbox
     if (oldItem === newItem) {
       newElement = null;
     }
-    const event = new (eventUtils.get(EventType.TOOLBOX_ITEM_SELECT))(
+    const event = new (eventUtils.get(eventUtils.TOOLBOX_ITEM_SELECT))(
       oldElement,
       newElement,
       this.workspace_.id,
@@ -969,7 +978,7 @@ export class Toolbox
    *
    * @returns True if a parent category was selected, false otherwise.
    */
-  private selectParent(): boolean {
+  private selectParent_(): boolean {
     if (!this.selectedItem_) {
       return false;
     }
@@ -997,7 +1006,7 @@ export class Toolbox
    *
    * @returns True if a child category was selected, false otherwise.
    */
-  private selectChild(): boolean {
+  private selectChild_(): boolean {
     if (!this.selectedItem_ || !this.selectedItem_.isCollapsible()) {
       return false;
     }
@@ -1006,7 +1015,7 @@ export class Toolbox
       collapsibleItem.toggleExpanded();
       return true;
     } else {
-      this.selectNext();
+      this.selectNext_();
       return true;
     }
   }
@@ -1016,17 +1025,16 @@ export class Toolbox
    *
    * @returns True if a next category was selected, false otherwise.
    */
-  private selectNext(): boolean {
+  private selectNext_(): boolean {
     if (!this.selectedItem_) {
       return false;
     }
 
-    const items = [...this.contents.values()];
-    let nextItemIdx = items.indexOf(this.selectedItem_) + 1;
-    if (nextItemIdx > -1 && nextItemIdx < items.length) {
-      let nextItem = items[nextItemIdx];
+    let nextItemIdx = this.contents_.indexOf(this.selectedItem_) + 1;
+    if (nextItemIdx > -1 && nextItemIdx < this.contents_.length) {
+      let nextItem = this.contents_[nextItemIdx];
       while (nextItem && !nextItem.isSelectable()) {
-        nextItem = items[++nextItemIdx];
+        nextItem = this.contents_[++nextItemIdx];
       }
       if (nextItem && nextItem.isSelectable()) {
         this.setSelectedItem(nextItem);
@@ -1041,17 +1049,16 @@ export class Toolbox
    *
    * @returns True if a previous category was selected, false otherwise.
    */
-  private selectPrevious(): boolean {
+  private selectPrevious_(): boolean {
     if (!this.selectedItem_) {
       return false;
     }
 
-    const items = [...this.contents.values()];
-    let prevItemIdx = items.indexOf(this.selectedItem_) - 1;
-    if (prevItemIdx > -1 && prevItemIdx < items.length) {
-      let prevItem = items[prevItemIdx];
+    let prevItemIdx = this.contents_.indexOf(this.selectedItem_) - 1;
+    if (prevItemIdx > -1 && prevItemIdx < this.contents_.length) {
+      let prevItem = this.contents_[prevItemIdx];
       while (prevItem && !prevItem.isSelectable()) {
-        prevItem = items[--prevItemIdx];
+        prevItem = this.contents_[--prevItemIdx];
       }
       if (prevItem && prevItem.isSelectable()) {
         this.setSelectedItem(prevItem);
@@ -1064,96 +1071,21 @@ export class Toolbox
   /** Disposes of this toolbox. */
   dispose() {
     this.workspace_.getComponentManager().removeComponent('toolbox');
-    this.flyout!.dispose();
-    this.contents.forEach((item) => item.dispose());
+    this.flyout_!.dispose();
+    for (let i = 0; i < this.contents_.length; i++) {
+      const toolboxItem = this.contents_[i];
+      toolboxItem.dispose();
+    }
 
     for (let j = 0; j < this.boundEvents_.length; j++) {
       browserEvents.unbind(this.boundEvents_[j]);
     }
     this.boundEvents_ = [];
-    this.contents.clear();
+    this.contents_ = [];
 
     if (this.HtmlDiv) {
       this.workspace_.getThemeManager().unsubscribe(this.HtmlDiv);
       dom.removeNode(this.HtmlDiv);
-    }
-
-    getFocusManager().unregisterTree(this);
-  }
-
-  /** See IFocusableNode.getFocusableElement. */
-  getFocusableElement(): HTMLElement | SVGElement {
-    if (!this.HtmlDiv) throw Error('Toolbox DOM has not yet been created.');
-    return this.HtmlDiv;
-  }
-
-  /** See IFocusableNode.getFocusableTree. */
-  getFocusableTree(): IFocusableTree {
-    return this;
-  }
-
-  /** See IFocusableNode.onNodeFocus. */
-  onNodeFocus(): void {}
-
-  /** See IFocusableNode.onNodeBlur. */
-  onNodeBlur(): void {}
-
-  /** See IFocusableNode.canBeFocused. */
-  canBeFocused(): boolean {
-    return true;
-  }
-
-  /** See IFocusableTree.getRootFocusableNode. */
-  getRootFocusableNode(): IFocusableNode {
-    return this;
-  }
-
-  /** See IFocusableTree.getRestoredFocusableNode. */
-  getRestoredFocusableNode(
-    previousNode: IFocusableNode | null,
-  ): IFocusableNode | null {
-    // Always try to select the first selectable toolbox item rather than the
-    // root of the toolbox.
-    if (!previousNode || previousNode === this) {
-      return this.getToolboxItems().find((item) => item.isSelectable()) ?? null;
-    }
-    return null;
-  }
-
-  /** See IFocusableTree.getNestedTrees. */
-  getNestedTrees(): Array<IFocusableTree> {
-    return [];
-  }
-
-  /** See IFocusableTree.lookUpFocusableNode. */
-  lookUpFocusableNode(id: string): IFocusableNode | null {
-    return this.getToolboxItemById(id) as IFocusableNode;
-  }
-
-  /** See IFocusableTree.onTreeFocus. */
-  onTreeFocus(
-    node: IFocusableNode,
-    _previousTree: IFocusableTree | null,
-  ): void {
-    if (node !== this) {
-      // Only select the item if it isn't already selected so as to not toggle.
-      if (this.getSelectedItem() !== node) {
-        this.setSelectedItem(node as IToolboxItem);
-      }
-    } else {
-      this.clearSelection();
-    }
-  }
-
-  /** See IFocusableTree.onTreeBlur. */
-  onTreeBlur(nextTree: IFocusableTree | null): void {
-    // If navigating to anything other than the toolbox's flyout then clear the
-    // selection so that the toolbox's flyout can automatically close.
-    if (!nextTree || nextTree !== this.flyout?.getWorkspace()) {
-      this.clearSelection();
-      if (this.flyout && isAutoHideable(this.flyout)) {
-        this.flyout.autoHide(false);
-      }
     }
   }
 }
@@ -1171,11 +1103,7 @@ Css.register(`
 }
 
 /* Category tree in Toolbox. */
-.blocklyToolbox {
-  box-sizing: border-box;
-  user-select: none;
-  -ms-user-select: none;
-  -webkit-user-select: none;
+.blocklyToolboxDiv {
   background-color: #ddd;
   overflow-x: visible;
   overflow-y: auto;
@@ -1185,13 +1113,13 @@ Css.register(`
   -webkit-tap-highlight-color: transparent;  /* issue #1345 */
 }
 
-.blocklyToolboxCategoryGroup {
+.blocklyToolboxContents {
   display: flex;
   flex-wrap: wrap;
   flex-direction: column;
 }
 
-.blocklyToolboxCategoryGroup:focus {
+.blocklyToolboxContents:focus {
   outline: none;
 }
 `);

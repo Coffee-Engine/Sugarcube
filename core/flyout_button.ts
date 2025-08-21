@@ -13,15 +13,9 @@
 
 import * as browserEvents from './browser_events.js';
 import * as Css from './css.js';
-import type {IBoundedElement} from './interfaces/i_bounded_element.js';
-import type {IFocusableNode} from './interfaces/i_focusable_node.js';
-import type {IFocusableTree} from './interfaces/i_focusable_tree.js';
-import type {IRenderedElement} from './interfaces/i_rendered_element.js';
-import {idGenerator} from './utils.js';
 import {Coordinate} from './utils/coordinate.js';
 import * as dom from './utils/dom.js';
 import * as parsing from './utils/parsing.js';
-import {Rect} from './utils/rect.js';
 import * as style from './utils/style.js';
 import {Svg} from './utils/svg.js';
 import type * as toolbox from './utils/toolbox.js';
@@ -30,9 +24,7 @@ import type {WorkspaceSvg} from './workspace_svg.js';
 /**
  * Class for a button or label in the flyout.
  */
-export class FlyoutButton
-  implements IBoundedElement, IRenderedElement, IFocusableNode
-{
+export class FlyoutButton {
   /** The horizontal margin around the text in the button. */
   static TEXT_MARGIN_X = 5;
 
@@ -48,8 +40,7 @@ export class FlyoutButton
   private readonly cssClass: string | null;
 
   /** Mouse up event data. */
-  private onMouseDownWrapper: browserEvents.Data;
-  private onMouseUpWrapper: browserEvents.Data;
+  private onMouseUpWrapper: browserEvents.Data | null = null;
   info: toolbox.ButtonOrLabelInfo;
 
   /** The width of the button's rect. */
@@ -59,32 +50,23 @@ export class FlyoutButton
   height = 0;
 
   /** The root SVG group for the button or label. */
-  private svgGroup: SVGGElement;
+  private svgGroup: SVGGElement | null = null;
 
   /** The SVG element with the text of the label or button. */
   private svgText: SVGTextElement | null = null;
 
   /**
-   * Holds the cursors svg element when the cursor is attached to the button.
-   * This is null if there is no cursor on the button.
-   */
-  cursorSvg: SVGElement | null = null;
-
-  /** The unique ID for this FlyoutButton. */
-  private id: string;
-
-  /**
    * @param workspace The workspace in which to place this button.
    * @param targetWorkspace The flyout's target workspace.
    * @param json The JSON specifying the label/button.
-   * @param isFlyoutLabel Whether this button should be styled as a label.
+   * @param isLabel_ Whether this button should be styled as a label.
    * @internal
    */
   constructor(
     private readonly workspace: WorkspaceSvg,
     private readonly targetWorkspace: WorkspaceSvg,
     json: toolbox.ButtonOrLabelInfo,
-    private readonly isFlyoutLabel: boolean,
+    private readonly isLabel_: boolean,
   ) {
     this.text = json['text'];
 
@@ -103,22 +85,27 @@ export class FlyoutButton
 
     /** The JSON specifying the label / button. */
     this.info = json;
-    let cssClass = this.isFlyoutLabel
-      ? 'blocklyFlyoutLabel'
-      : 'blocklyFlyoutButton';
+  }
+
+  /**
+   * Create the button elements.
+   *
+   * @returns The button's SVG group.
+   */
+  createDom(): SVGElement {
+    let cssClass = this.isLabel_ ? 'blocklyFlyoutLabel' : 'blocklyFlyoutButton';
     if (this.cssClass) {
       cssClass += ' ' + this.cssClass;
     }
 
-    this.id = idGenerator.getNextUniqueId();
     this.svgGroup = dom.createSvgElement(
       Svg.G,
-      {'id': this.id, 'class': cssClass},
+      {'class': cssClass},
       this.workspace.getCanvas(),
     );
 
     let shadow;
-    if (!this.isFlyoutLabel) {
+    if (!this.isLabel_) {
       // Shadow rectangle (light source does not mirror in RTL).
       shadow = dom.createSvgElement(
         Svg.RECT,
@@ -136,7 +123,7 @@ export class FlyoutButton
     const rect = dom.createSvgElement(
       Svg.RECT,
       {
-        'class': this.isFlyoutLabel
+        'class': this.isLabel_
           ? 'blocklyFlyoutLabelBackground'
           : 'blocklyFlyoutButtonBackground',
         'rx': FlyoutButton.BORDER_RADIUS,
@@ -148,7 +135,7 @@ export class FlyoutButton
     const svgText = dom.createSvgElement(
       Svg.TEXT,
       {
-        'class': this.isFlyoutLabel ? 'blocklyFlyoutLabelText' : 'blocklyText',
+        'class': this.isLabel_ ? 'blocklyFlyoutLabelText' : 'blocklyText',
         'x': 0,
         'y': 0,
         'text-anchor': 'middle',
@@ -161,7 +148,7 @@ export class FlyoutButton
       text += '\u200F';
     }
     svgText.textContent = text;
-    if (this.isFlyoutLabel) {
+    if (this.isLabel_) {
       this.svgText = svgText;
       this.workspace
         .getThemeManager()
@@ -183,9 +170,9 @@ export class FlyoutButton
       fontWeight,
       fontFamily,
     );
-    this.height = this.height || fontMetrics.height;
+    this.height = fontMetrics.height;
 
-    if (!this.isFlyoutLabel) {
+    if (!this.isLabel_) {
       this.width += 2 * FlyoutButton.TEXT_MARGIN_X;
       this.height += 2 * FlyoutButton.TEXT_MARGIN_Y;
       shadow?.setAttribute('width', String(this.width));
@@ -202,24 +189,15 @@ export class FlyoutButton
 
     this.updateTransform();
 
-    this.onMouseDownWrapper = browserEvents.conditionalBind(
-      this.svgGroup,
-      'pointerdown',
-      this,
-      this.onMouseDown,
-    );
+    // AnyDuringMigration because:  Argument of type 'SVGGElement | null' is not
+    // assignable to parameter of type 'EventTarget'.
     this.onMouseUpWrapper = browserEvents.conditionalBind(
-      this.svgGroup,
+      this.svgGroup as AnyDuringMigration,
       'pointerup',
       this,
       this.onMouseUp,
     );
-  }
-
-  createDom(): SVGElement {
-    // No-op, now handled in constructor. Will be removed in followup refactor
-    // PR that updates the flyout classes to use inflaters.
-    return this.svgGroup;
+    return this.svgGroup!;
   }
 
   /** Correctly position the flyout button and make it visible. */
@@ -248,20 +226,9 @@ export class FlyoutButton
     this.updateTransform();
   }
 
-  /**
-   * Move the element by a relative offset.
-   *
-   * @param dx Horizontal offset in workspace units.
-   * @param dy Vertical offset in workspace units.
-   * @param _reason Why is this move happening?  'user', 'bump', 'snap'...
-   */
-  moveBy(dx: number, dy: number, _reason?: string[]) {
-    this.moveTo(this.position.x + dx, this.position.y + dy);
-  }
-
   /** @returns Whether or not the button is a label. */
   isLabel(): boolean {
-    return this.isFlyoutLabel;
+    return this.isLabel_;
   }
 
   /**
@@ -272,21 +239,6 @@ export class FlyoutButton
    */
   getPosition(): Coordinate {
     return this.position;
-  }
-
-  /**
-   * Returns the coordinates of a bounded element describing the dimensions of
-   * the element. Coordinate system: workspace coordinates.
-   *
-   * @returns Object with coordinates of the bounded element.
-   */
-  getBoundingRectangle() {
-    return new Rect(
-      this.position.y,
-      this.position.y + this.height,
-      this.position.x,
-      this.position.x + this.width,
-    );
   }
 
   /** @returns Text of the button. */
@@ -303,41 +255,16 @@ export class FlyoutButton
     return this.targetWorkspace;
   }
 
-  /**
-   * Get the button's workspace.
-   *
-   * @returns The workspace in which to place this button.
-   */
-  getWorkspace(): WorkspaceSvg {
-    return this.workspace;
-  }
-
   /** Dispose of this button. */
   dispose() {
-    browserEvents.unbind(this.onMouseDownWrapper);
-    browserEvents.unbind(this.onMouseUpWrapper);
+    if (this.onMouseUpWrapper) {
+      browserEvents.unbind(this.onMouseUpWrapper);
+    }
     if (this.svgGroup) {
       dom.removeNode(this.svgGroup);
     }
     if (this.svgText) {
       this.workspace.getThemeManager().unsubscribe(this.svgText);
-    }
-  }
-
-  /**
-   * Add the cursor SVG to this buttons's SVG group.
-   *
-   * @param cursorSvg The SVG root of the cursor to be added to the button SVG
-   *     group.
-   */
-  setCursorSvg(cursorSvg: SVGElement) {
-    if (!cursorSvg) {
-      this.cursorSvg = null;
-      return;
-    }
-    if (this.svgGroup) {
-      this.svgGroup.appendChild(cursorSvg);
-      this.cursorSvg = cursorSvg;
     }
   }
 
@@ -352,60 +279,24 @@ export class FlyoutButton
       gesture.cancel();
     }
 
-    if (this.isFlyoutLabel && this.callbackKey) {
+    if (this.isLabel_ && this.callbackKey) {
       console.warn(
         'Labels should not have callbacks. Label text: ' + this.text,
       );
     } else if (
-      !this.isFlyoutLabel &&
+      !this.isLabel_ &&
       !(
         this.callbackKey &&
         this.targetWorkspace.getButtonCallback(this.callbackKey)
       )
     ) {
       console.warn('Buttons should have callbacks. Button text: ' + this.text);
-    } else if (!this.isFlyoutLabel) {
+    } else if (!this.isLabel_) {
       const callback = this.targetWorkspace.getButtonCallback(this.callbackKey);
       if (callback) {
         callback(this);
       }
     }
-  }
-
-  private onMouseDown(e: PointerEvent) {
-    const gesture = this.targetWorkspace.getGesture(e);
-    const flyout = this.targetWorkspace.getFlyout();
-    if (gesture && flyout) {
-      gesture.handleFlyoutStart(e, flyout);
-    }
-  }
-
-  /**
-   * @returns The root SVG element of this rendered element.
-   */
-  getSvgRoot() {
-    return this.svgGroup;
-  }
-
-  /** See IFocusableNode.getFocusableElement. */
-  getFocusableElement(): HTMLElement | SVGElement {
-    return this.svgGroup;
-  }
-
-  /** See IFocusableNode.getFocusableTree. */
-  getFocusableTree(): IFocusableTree {
-    return this.workspace;
-  }
-
-  /** See IFocusableNode.onNodeFocus. */
-  onNodeFocus(): void {}
-
-  /** See IFocusableNode.onNodeBlur. */
-  onNodeBlur(): void {}
-
-  /** See IFocusableNode.canBeFocused. */
-  canBeFocused(): boolean {
-    return true;
   }
 }
 

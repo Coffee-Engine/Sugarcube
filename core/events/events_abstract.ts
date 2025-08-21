@@ -14,7 +14,8 @@
 
 import * as common from '../common.js';
 import type {Workspace} from '../workspace.js';
-import {getGroup, getRecordUndo} from './utils.js';
+
+import * as eventUtils from './utils.js';
 
 /**
  * Abstract class for an event.
@@ -47,8 +48,8 @@ export abstract class Abstract {
   type = '';
 
   constructor() {
-    this.group = getGroup();
-    this.recordUndo = getRecordUndo();
+    this.group = eventUtils.getGroup();
+    this.recordUndo = eventUtils.getRecordUndo();
   }
 
   /**
@@ -107,6 +108,7 @@ export abstract class Abstract {
    *
    * @returns The workspace the event belongs to.
    * @throws {Error} if workspace is null.
+   * @internal
    */
   getEventWorkspace_(): Workspace {
     let workspace;

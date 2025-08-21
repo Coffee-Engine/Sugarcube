@@ -21,7 +21,6 @@ import {
   FieldInputValidator,
 } from './field_input.js';
 import * as fieldRegistry from './field_registry.js';
-import * as dom from './utils/dom.js';
 import * as parsing from './utils/parsing.js';
 
 /**
@@ -50,13 +49,6 @@ export class FieldTextInput extends FieldInput<string> {
     super(value, validator, config);
   }
 
-  override initView() {
-    super.initView();
-    if (this.fieldGroup_) {
-      dom.addClass(this.fieldGroup_, 'blocklyTextInputField');
-    }
-  }
-
   /**
    * Ensure that the input value casts to a valid string.
    *
@@ -81,9 +73,7 @@ export class FieldTextInput extends FieldInput<string> {
    * @nocollapse
    * @internal
    */
-  static override fromJson(
-    options: FieldTextInputFromJsonConfig,
-  ): FieldTextInput {
+  static fromJson(options: FieldTextInputFromJsonConfig): FieldTextInput {
     const text = parsing.replaceMessageReferences(options.text);
     // `this` might be a subclass of FieldTextInput if that class doesn't
     // override the static fromJson method.

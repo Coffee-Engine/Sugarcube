@@ -4,30 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {Bubble} from './bubble.js';
 import {Coordinate} from '../utils/coordinate.js';
 import * as dom from '../utils/dom.js';
 import {Rect} from '../utils/rect.js';
 import {Size} from '../utils/size.js';
 import {Svg} from '../utils/svg.js';
 import {WorkspaceSvg} from '../workspace_svg.js';
-import {Bubble} from './bubble.js';
 
 /**
  * A bubble that displays non-editable text. Used by the warning icon.
  */
 export class TextBubble extends Bubble {
-  private paragraph: SVGGElement;
+  private paragraph: SVGTextElement;
 
   constructor(
     private text: string,
-    public readonly workspace: WorkspaceSvg,
+    protected readonly workspace: WorkspaceSvg,
     protected anchor: Coordinate,
     protected ownerRect?: Rect,
   ) {
     super(workspace, anchor, ownerRect);
     this.paragraph = this.stringToSvg(text, this.contentContainer);
     this.updateBubbleSize();
-    dom.addClass(this.svgRoot, 'blocklyTextBubble');
   }
 
   /** @returns the current text of this text bubble. */
@@ -49,52 +48,43 @@ export class TextBubble extends Bubble {
    */
   private stringToSvg(text: string, container: SVGGElement) {
     const paragraph = this.createParagraph(container);
-    const fragments = this.createTextFragments(paragraph, text);
+    const spans = this.createSpans(paragraph, text);
     if (this.workspace.RTL)
-      this.rightAlignTextFragments(paragraph.getBBox().width, fragments);
+      this.rightAlignSpans(paragraph.getBBox().width, spans);
     return paragraph;
   }
 
-  /** Creates the paragraph container for this bubble's view's text fragments. */
-  private createParagraph(container: SVGGElement): SVGGElement {
+  /** Creates the paragraph container for this bubble's view's spans. */
+  private createParagraph(container: SVGGElement): SVGTextElement {
     return dom.createSvgElement(
-      Svg.G,
+      Svg.TEXT,
       {
         'class': 'blocklyText blocklyBubbleText blocklyNoPointerEvents',
-        'transform': `translate(0,${Bubble.BORDER_WIDTH})`,
-        'style': `direction: ${this.workspace.RTL ? 'rtl' : 'ltr'}`,
+        'y': Bubble.BORDER_WIDTH,
       },
       container,
     );
   }
 
-  /** Creates the text fragments visualizing the text of this bubble. */
-  private createTextFragments(
-    parent: SVGGElement,
-    text: string,
-  ): SVGTextElement[] {
-    let lineNum = 1;
+  /** Creates the spans visualizing the text of this bubble. */
+  private createSpans(parent: SVGTextElement, text: string): SVGTSpanElement[] {
     return text.split('\n').map((line) => {
-      const fragment = dom.createSvgElement(
-        Svg.TEXT,
-        {'y': `${lineNum}em`, 'x': Bubble.BORDER_WIDTH},
+      const tspan = dom.createSvgElement(
+        Svg.TSPAN,
+        {'dy': '1em', 'x': Bubble.BORDER_WIDTH},
         parent,
       );
       const textNode = document.createTextNode(line);
-      fragment.appendChild(textNode);
-      lineNum += 1;
-      return fragment;
+      tspan.appendChild(textNode);
+      return tspan;
     });
   }
 
-  /** Right aligns the given text fragments. */
-  private rightAlignTextFragments(
-    maxWidth: number,
-    fragments: SVGTextElement[],
-  ) {
-    for (const text of fragments) {
-      text.setAttribute('text-anchor', 'start');
-      text.setAttribute('x', `${maxWidth + Bubble.BORDER_WIDTH}`);
+  /** Right aligns the given spans. */
+  private rightAlignSpans(maxWidth: number, spans: SVGTSpanElement[]) {
+    for (const span of spans) {
+      span.setAttribute('text-anchor', 'end');
+      span.setAttribute('x', `${maxWidth + Bubble.BORDER_WIDTH}`);
     }
   }
 

@@ -7,18 +7,15 @@
 // Former goog.module ID: Blockly.Warning
 
 import type {BlockSvg} from '../block_svg.js';
-import {TextBubble} from '../bubbles/text_bubble.js';
-import {EventType} from '../events/type.js';
-import * as eventUtils from '../events/utils.js';
-import type {IBubble} from '../interfaces/i_bubble.js';
-import type {IHasBubble} from '../interfaces/i_has_bubble.js';
-import * as renderManagement from '../render_management.js';
-import {Size} from '../utils.js';
 import {Coordinate} from '../utils/coordinate.js';
 import * as dom from '../utils/dom.js';
-import {Rect} from '../utils/rect.js';
-import {Svg} from '../utils/svg.js';
+import * as eventUtils from '../events/utils.js';
 import {Icon} from './icon.js';
+import type {IHasBubble} from '../interfaces/i_has_bubble.js';
+import {Rect} from '../utils/rect.js';
+import {Size} from '../utils.js';
+import {Svg} from '../utils/svg.js';
+import {TextBubble} from '../bubbles/text_bubble.js';
 import {IconType} from './icon_types.js';
 
 /** The size of the warning icon in workspace-scale units. */
@@ -91,7 +88,7 @@ export class WarningIcon extends Icon implements IHasBubble {
       },
       this.svgRoot,
     );
-    dom.addClass(this.svgRoot!, 'blocklyWarningIcon');
+    dom.addClass(this.svgRoot!, 'blockly-icon-warning');
   }
 
   override dispose() {
@@ -109,7 +106,7 @@ export class WarningIcon extends Icon implements IHasBubble {
 
   override applyColour(): void {
     super.applyColour();
-    this.textBubble?.setColour(this.sourceBlock.getColour());
+    this.textBubble?.setColour(this.sourceBlock.style.colourPrimary);
   }
 
   override updateCollapsed(): void {
@@ -171,10 +168,8 @@ export class WarningIcon extends Icon implements IHasBubble {
     return !!this.textBubble;
   }
 
-  async setBubbleVisible(visible: boolean): Promise<void> {
+  setBubbleVisible(visible: boolean): void {
     if (this.bubbleIsVisible() === visible) return;
-
-    await renderManagement.finishQueuedRenders();
 
     if (visible) {
       this.textBubble = new TextBubble(
@@ -190,17 +185,12 @@ export class WarningIcon extends Icon implements IHasBubble {
     }
 
     eventUtils.fire(
-      new (eventUtils.get(EventType.BUBBLE_OPEN))(
+      new (eventUtils.get(eventUtils.BUBBLE_OPEN))(
         this.sourceBlock,
         visible,
         'warning',
       ),
     );
-  }
-
-  /** See IHasBubble.getBubble. */
-  getBubble(): IBubble | null {
-    return this.textBubble;
   }
 
   /**

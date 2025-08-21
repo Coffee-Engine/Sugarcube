@@ -6,27 +6,26 @@
 
 // Former goog.module ID: Blockly.libraryBlocks.loops
 
+import type {Abstract as AbstractEvent} from '../core/events/events_abstract.js';
 import type {Block} from '../core/block.js';
-import {
-  createBlockDefinitionsFromJsonArray,
-  defineBlocks,
-} from '../core/common.js';
 import * as ContextMenu from '../core/contextmenu.js';
 import type {
   ContextMenuOption,
   LegacyContextMenuOption,
 } from '../core/contextmenu_registry.js';
 import * as Events from '../core/events/events.js';
-import type {Abstract as AbstractEvent} from '../core/events/events_abstract.js';
-import * as eventUtils from '../core/events/utils.js';
 import * as Extensions from '../core/extensions.js';
+import {Msg} from '../core/msg.js';
+import {
+  createBlockDefinitionsFromJsonArray,
+  defineBlocks,
+} from '../core/common.js';
 import '../core/field_dropdown.js';
 import '../core/field_label.js';
 import '../core/field_number.js';
 import '../core/field_variable.js';
-import {FieldVariable} from '../core/field_variable.js';
 import '../core/icons/warning_icon.js';
-import {Msg} from '../core/msg.js';
+import {FieldVariable} from '../core/field_variable.js';
 import {WorkspaceSvg} from '../core/workspace_svg.js';
 
 /**
@@ -269,7 +268,7 @@ const CUSTOM_CONTEXT_MENU_CREATE_VARIABLES_GET_MIXIN = {
     }
     const varField = this.getField('VAR') as FieldVariable;
     const variable = varField.getVariable()!;
-    const varName = variable.getName();
+    const varName = variable.name;
     if (!this.isCollapsed() && varName !== null) {
       const getVarBlockState = {
         type: 'variables_get',
@@ -336,11 +335,6 @@ interface ControlFlowInLoopMixin extends ControlFlowInLoopMixinType {}
 type ControlFlowInLoopMixinType = typeof CONTROL_FLOW_IN_LOOP_CHECK_MIXIN;
 
 /**
- * The language-neutral ID for when the reason why a block is disabled is
- * because the block is only valid inside of a loop.
- */
-const CONTROL_FLOW_NOT_IN_LOOP_DISABLED_REASON = 'CONTROL_FLOW_NOT_IN_LOOP';
-/**
  * This mixin adds a check to make sure the 'controls_flow_statements' block
  * is contained in a loop. Otherwise a warning is added to the block.
  */
@@ -371,30 +365,19 @@ const CONTROL_FLOW_IN_LOOP_CHECK_MIXIN = {
     // Don't change state if:
     //   * It's at the start of a drag.
     //   * It's not a move event.
-    if (
-      !ws.isDragging ||
-      ws.isDragging() ||
-      (e.type !== Events.BLOCK_MOVE && e.type !== Events.BLOCK_CREATE)
-    ) {
+    if (!ws.isDragging || ws.isDragging() || e.type !== Events.BLOCK_MOVE) {
       return;
     }
     const enabled = !!this.getSurroundLoop();
     this.setWarningText(
       enabled ? null : Msg['CONTROLS_FLOW_STATEMENTS_WARNING'],
     );
-
     if (!this.isInFlyout) {
-      try {
-        // There is no need to record the enable/disable change on the undo/redo
-        // list since the change will be automatically recreated when replayed.
-        eventUtils.setRecordUndo(false);
-        this.setDisabledReason(
-          !enabled,
-          CONTROL_FLOW_NOT_IN_LOOP_DISABLED_REASON,
-        );
-      } finally {
-        eventUtils.setRecordUndo(true);
-      }
+      const group = Events.getGroup();
+      // Makes it so the move and the disable event get undone together.
+      Events.setGroup(e.group);
+      this.setEnabled(enabled);
+      Events.setGroup(group);
     }
   },
 };

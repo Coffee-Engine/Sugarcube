@@ -38,22 +38,18 @@ export function disposeUiEffect(block: BlockSvg) {
   const svgGroup = block.getSvgRoot();
   workspace.getAudioManager().play('delete');
 
-  const xy = block.getRelativeToSurfaceXY();
+  const xy = workspace.getSvgXY(svgGroup);
   // Deeply clone the current block.
   const clone: SVGGElement = svgGroup.cloneNode(true) as SVGGElement;
   clone.setAttribute('transform', 'translate(' + xy.x + ',' + xy.y + ')');
-  workspace.getLayerManager()?.appendToAnimationLayer({
-    getSvgRoot: () => {
-      return clone;
-    },
-  });
+  workspace.getParentSvg().appendChild(clone);
   const cloneRect = {
     'x': xy.x,
     'y': xy.y,
     'width': block.width,
     'height': block.height,
   };
-  disposeUiStep(clone, cloneRect, workspace.RTL, new Date());
+  disposeUiStep(clone, cloneRect, workspace.RTL, new Date(), workspace.scale);
 }
 /**
  * Animate a cloned block and eventually dispose of it.
@@ -64,26 +60,29 @@ export function disposeUiEffect(block: BlockSvg) {
  * @param rect Starting rect of the clone.
  * @param rtl True if RTL, false if LTR.
  * @param start Date of animation's start.
+ * @param workspaceScale Scale of workspace.
  */
 function disposeUiStep(
   clone: Element,
   rect: CloneRect,
   rtl: boolean,
   start: Date,
+  workspaceScale: number,
 ) {
   const ms = new Date().getTime() - start.getTime();
   const percent = ms / 150;
   if (percent > 1) {
     dom.removeNode(clone);
   } else {
-    const x = rect.x + (((rtl ? -1 : 1) * rect.width) / 2) * percent;
-    const y = rect.y + (rect.height / 2) * percent;
-    const scale = 1 - percent;
+    const x =
+      rect.x + (((rtl ? -1 : 1) * rect.width * workspaceScale) / 2) * percent;
+    const y = rect.y + rect.height * workspaceScale * percent;
+    const scale = (1 - percent) * workspaceScale;
     clone.setAttribute(
       'transform',
       'translate(' + x + ',' + y + ')' + ' scale(' + scale + ')',
     );
-    setTimeout(disposeUiStep, 10, clone, rect, rtl, start);
+    setTimeout(disposeUiStep, 10, clone, rect, rtl, start, workspaceScale);
   }
 }
 
@@ -176,7 +175,7 @@ export function disconnectUiEffect(block: BlockSvg) {
   }
   // Start the animation.
   wobblingBlock = block;
-  disconnectUiStep(block, magnitude, new Date(), 0);
+  disconnectUiStep(block, magnitude, new Date());
 }
 
 /**
@@ -184,30 +183,22 @@ export function disconnectUiEffect(block: BlockSvg) {
  *
  * @param block Block to animate.
  * @param magnitude Maximum degrees skew (reversed for RTL).
- * @param start Date of animation's start for deciding when to stop.
- * @param step Which step of the animation we're on.
+ * @param start Date of animation's start.
  */
-function disconnectUiStep(
-  block: BlockSvg,
-  magnitude: number,
-  start: Date,
-  step: number,
-) {
+function disconnectUiStep(block: BlockSvg, magnitude: number, start: Date) {
   const DURATION = 200; // Milliseconds.
-  const WIGGLES = [0.66, 1, 0.66, 0, -0.66, -1, -0.66, 0]; // Single cycle
+  const WIGGLES = 3; // Half oscillations.
+
+  const ms = new Date().getTime() - start.getTime();
+  const percent = ms / DURATION;
 
   let skew = '';
-  if (start.getTime() + DURATION > new Date().getTime()) {
-    const val = Math.round(WIGGLES[step % WIGGLES.length] * magnitude);
-    skew = `skewX(${val})`;
-    disconnectPid = setTimeout(
-      disconnectUiStep,
-      15,
-      block,
-      magnitude,
-      start,
-      step + 1,
+  if (percent <= 1) {
+    const val = Math.round(
+      Math.sin(percent * Math.PI * WIGGLES) * (1 - percent) * magnitude,
     );
+    skew = `skewX(${val})`;
+    disconnectPid = setTimeout(disconnectUiStep, 10, block, magnitude, start);
   }
 
   block

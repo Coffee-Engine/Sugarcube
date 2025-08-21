@@ -39,9 +39,7 @@ export function controls_if(block: Block, generator: LuaGenerator): string {
   } while (block.getInput('IF' + n));
 
   if (block.getInput('ELSE') || generator.STATEMENT_SUFFIX) {
-    let branchCode = block.getInput('ELSE')
-      ? generator.statementToCode(block, 'ELSE')
-      : '';
+    let branchCode = generator.statementToCode(block, 'ELSE');
     if (generator.STATEMENT_SUFFIX) {
       branchCode =
         generator.prefixLines(

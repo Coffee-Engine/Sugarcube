@@ -2,5 +2,5 @@
 
 module.exports = {
   ui: 'tdd',
-  require: __dirname + '/test/hooks.mjs',
+  require: __dirname + '/test/hooks.js',
 };

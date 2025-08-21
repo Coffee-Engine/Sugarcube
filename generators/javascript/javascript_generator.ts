@@ -11,13 +11,13 @@
 
 // Former goog.module ID: Blockly.JavaScript
 
+import * as Variables from '../../core/variables.js';
+import * as stringUtils from '../../core/utils/string.js';
 import type {Block} from '../../core/block.js';
 import {CodeGenerator} from '../../core/generator.js';
-import {inputTypes} from '../../core/inputs/input_types.js';
 import {Names, NameType} from '../../core/names.js';
-import * as stringUtils from '../../core/utils/string.js';
-import * as Variables from '../../core/variables.js';
 import type {Workspace} from '../../core/workspace.js';
+import {inputTypes} from '../../core/inputs/input_types.js';
 
 /**
  * Order of operation ENUMs.
@@ -251,6 +251,7 @@ export class JavascriptGenerator extends CodeGenerator {
    * @param code The JavaScript code created for this block.
    * @param thisOnly True to generate code for only this statement.
    * @returns JavaScript code with comments and subsequent blocks added.
+   * @protected
    */
   scrub_(block: Block, code: string, thisOnly = false): string {
     let commentCode = '';

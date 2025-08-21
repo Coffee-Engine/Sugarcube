@@ -5,7 +5,7 @@
  */
 
 import * as Blockly from '../../build/src/core/blockly.js';
-import {assert} from '../../node_modules/chai/chai.js';
+import {createDeprecationWarningStub} from './test_helpers/warnings.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
@@ -37,20 +37,22 @@ suite('Field Registry', function () {
       Blockly.fieldRegistry.register('field_custom_test', CustomFieldType);
     });
     test('fromJson as Key', function () {
-      assert.throws(function () {
+      chai.assert.throws(function () {
         Blockly.fieldRegistry.register(CustomFieldType.fromJson, '');
       }, 'Invalid name');
     });
     test('No fromJson', function () {
-      class IncorrectField {}
-      assert.throws(function () {
-        Blockly.fieldRegistry.register('field_custom_test', IncorrectField);
+      const fromJson = CustomFieldType.fromJson;
+      delete CustomFieldType.fromJson;
+      chai.assert.throws(function () {
+        Blockly.fieldRegistry.register('field_custom_test', CustomFieldType);
       }, 'must have a fromJson function');
+      CustomFieldType.fromJson = fromJson;
     });
     test('fromJson not a function', function () {
       const fromJson = CustomFieldType.fromJson;
       CustomFieldType.fromJson = true;
-      assert.throws(function () {
+      chai.assert.throws(function () {
         Blockly.fieldRegistry.register('field_custom_test', CustomFieldType);
       }, 'must have a fromJson function');
       CustomFieldType.fromJson = fromJson;
@@ -67,8 +69,8 @@ suite('Field Registry', function () {
 
       const field = Blockly.fieldRegistry.fromJson(json);
 
-      assert.isNotNull(field);
-      assert.equal(field.getValue(), 'ok');
+      chai.assert.isNotNull(field);
+      chai.assert.equal(field.getValue(), 'ok');
     });
     test('Not Registered', function () {
       const json = {
@@ -78,8 +80,8 @@ suite('Field Registry', function () {
 
       const spy = sinon.stub(console, 'warn');
       const field = Blockly.fieldRegistry.fromJson(json);
-      assert.isNull(field);
-      assert.isTrue(spy.called);
+      chai.assert.isNull(field);
+      chai.assert.isTrue(spy.called);
       spy.restore();
     });
     test('Case Different', function () {
@@ -92,24 +94,8 @@ suite('Field Registry', function () {
 
       const field = Blockly.fieldRegistry.fromJson(json);
 
-      assert.isNotNull(field);
-      assert.equal(field.getValue(), 'ok');
-    });
-    test('Did not override fromJson', function () {
-      // This class will have a fromJson method, so it can be registered
-      // but it doesn't override the abstract class's method so it throws
-      class IncorrectField extends Blockly.Field {}
-
-      Blockly.fieldRegistry.register('field_custom_test', IncorrectField);
-
-      const json = {
-        type: 'field_custom_test',
-        value: 'ok',
-      };
-
-      assert.throws(function () {
-        Blockly.fieldRegistry.fromJson(json);
-      }, 'Attempted to instantiate a field from the registry');
+      chai.assert.isNotNull(field);
+      chai.assert.equal(field.getValue(), 'ok');
     });
   });
 });

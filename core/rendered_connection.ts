@@ -13,21 +13,15 @@
 
 import type {Block} from './block.js';
 import type {BlockSvg} from './block_svg.js';
+import * as common from './common.js';
 import {config} from './config.js';
 import {Connection} from './connection.js';
 import type {ConnectionDB} from './connection_db.js';
 import {ConnectionType} from './connection_type.js';
-import * as ContextMenu from './contextmenu.js';
-import {ContextMenuRegistry} from './contextmenu_registry.js';
 import * as eventUtils from './events/utils.js';
-import {IContextMenu} from './interfaces/i_contextmenu.js';
-import type {IFocusableNode} from './interfaces/i_focusable_node.js';
-import type {IFocusableTree} from './interfaces/i_focusable_tree.js';
 import {hasBubble} from './interfaces/i_has_bubble.js';
 import * as internalConstants from './internal_constants.js';
 import {Coordinate} from './utils/coordinate.js';
-import * as svgMath from './utils/svg_math.js';
-import {WorkspaceSvg} from './workspace_svg.js';
 
 /** Maximum randomness in workspace units for bumping a block. */
 const BUMP_RANDOMNESS = 10;
@@ -35,10 +29,7 @@ const BUMP_RANDOMNESS = 10;
 /**
  * Class for a connection between blocks that may be rendered on screen.
  */
-export class RenderedConnection
-  extends Connection
-  implements IContextMenu, IFocusableNode
-{
+export class RenderedConnection extends Connection {
   // TODO(b/109816955): remove '!', see go/strict-prop-init-fix.
   sourceBlock_!: BlockSvg;
   private readonly db: ConnectionDB;
@@ -126,82 +117,59 @@ export class RenderedConnection
    * Move the block(s) belonging to the connection to a point where they don't
    * visually interfere with the specified connection.
    *
-   * @param superiorConnection The connection to move away from. The provided
-   *     connection should be the superior connection and should not be
-   *     connected to this connection.
-   * @param initiatedByThis Whether or not the block group that was manipulated
-   *     recently causing bump checks is associated with the inferior
-   *     connection. Defaults to false.
+   * @param staticConnection The connection to move away from.
    * @internal
    */
-  bumpAwayFrom(
-    superiorConnection: RenderedConnection,
-    initiatedByThis = false,
-  ) {
+  bumpAwayFrom(staticConnection: RenderedConnection) {
     if (this.sourceBlock_.workspace.isDragging()) {
       // Don't move blocks around while the user is doing the same.
       return;
     }
-    let offsetX =
-      config.snapRadius + Math.floor(Math.random() * BUMP_RANDOMNESS);
-    let offsetY =
-      config.snapRadius + Math.floor(Math.random() * BUMP_RANDOMNESS);
-    /* eslint-disable-next-line @typescript-eslint/no-this-alias */
-    const inferiorConnection = this;
-    const superiorRootBlock = superiorConnection.sourceBlock_.getRootBlock();
-    const inferiorRootBlock = inferiorConnection.sourceBlock_.getRootBlock();
-
-    if (superiorRootBlock.isInFlyout || inferiorRootBlock.isInFlyout) {
+    // Move the root block.
+    let rootBlock = this.sourceBlock_.getRootBlock();
+    if (rootBlock.isInFlyout) {
       // Don't move blocks around in a flyout.
       return;
     }
-    let moveInferior = true;
-    if (!inferiorRootBlock.isMovable()) {
-      // Can't bump an immovable block away.
+    let reverse = false;
+    if (!rootBlock.isMovable()) {
+      // Can't bump an uneditable block away.
       // Check to see if the other block is movable.
-      if (!superiorRootBlock.isMovable()) {
-        // Neither block is movable, abort operation.
+      rootBlock = staticConnection.getSourceBlock().getRootBlock();
+      if (!rootBlock.isMovable()) {
         return;
-      } else {
-        // Only the superior block group is movable.
-        moveInferior = false;
-        // The superior block group moves in the opposite direction.
-        offsetX = -offsetX;
-        offsetY = -offsetY;
       }
-    } else if (superiorRootBlock.isMovable()) {
-      // Both block groups are movable. The one on the inferior side will be
-      // moved to make space for the superior one. However, it's possible that
-      // both groups of blocks have an inferior connection that bumps into a
-      // superior connection on the other group, which could result in both
-      // groups moving in the same direction and eventually bumping each other
-      // again. It would be better if one group of blocks could consistently
-      // move in an orthogonal direction from the other, so that they become
-      // separated in the end. We can designate one group the "initiator" if
-      // it's the one that was most recently manipulated, causing inputs to be
-      // checked for bumpable neighbors. As a useful heuristic, in the case
-      // where the inferior connection belongs to the initiator group, moving it
-      // in the orthogonal direction will separate the blocks better.
-      if (initiatedByThis) {
-        offsetY = -offsetY;
-      }
+      // Swap the connections and move the 'static' connection instead.
+      /* eslint-disable-next-line @typescript-eslint/no-this-alias */
+      staticConnection = this;
+      reverse = true;
     }
-    const staticConnection = moveInferior
-      ? superiorConnection
-      : inferiorConnection;
-    const dynamicConnection = moveInferior
-      ? inferiorConnection
-      : superiorConnection;
-    const dynamicRootBlock = moveInferior
-      ? inferiorRootBlock
-      : superiorRootBlock;
     // Raise it to the top for extra visibility.
-    if (dynamicRootBlock.RTL) {
-      offsetX = -offsetX;
+    const selected = common.getSelected() == rootBlock;
+    selected || rootBlock.addSelect();
+    let dx =
+      staticConnection.x +
+      config.snapRadius +
+      Math.floor(Math.random() * BUMP_RANDOMNESS) -
+      this.x;
+    let dy =
+      staticConnection.y +
+      config.snapRadius +
+      Math.floor(Math.random() * BUMP_RANDOMNESS) -
+      this.y;
+    if (reverse) {
+      // When reversing a bump due to an uneditable block, bump up.
+      dy = -dy;
     }
-    const dx = staticConnection.x + offsetX - dynamicConnection.x;
-    const dy = staticConnection.y + offsetY - dynamicConnection.y;
-    dynamicRootBlock.moveBy(dx, dy, ['bump']);
+    if (rootBlock.RTL) {
+      dx =
+        staticConnection.x -
+        config.snapRadius -
+        Math.floor(Math.random() * BUMP_RANDOMNESS) -
+        this.x;
+    }
+    rootBlock.moveBy(dx, dy, ['bump']);
+    selected || rootBlock.removeSelect();
   }
 
   /**
@@ -322,28 +290,13 @@ export class RenderedConnection
   /** Add highlighting around this connection. */
   highlight() {
     this.highlighted = true;
-
-    // Note that this needs to be done synchronously (vs. queuing a render pass)
-    // since only a displayed element can be focused, and this focusable node is
-    // implemented to make itself visible immediately prior to receiving DOM
-    // focus. It's expected that the connection's position should already be
-    // correct by this point (otherwise it will be corrected in a subsequent
-    // draw pass).
-    const highlightSvg = this.findHighlightSvg();
-    if (highlightSvg) {
-      highlightSvg.style.display = '';
-    }
+    this.getSourceBlock().queueRender();
   }
 
   /** Remove the highlighting around this connection. */
   unhighlight() {
     this.highlighted = false;
-
-    // Note that this is done synchronously for parity with highlight().
-    const highlightSvg = this.findHighlightSvg();
-    if (highlightSvg) {
-      highlightSvg.style.display = 'none';
-    }
+    this.getSourceBlock().queueRender();
   }
 
   /** Returns true if this connection is highlighted, false otherwise. */
@@ -436,10 +389,9 @@ export class RenderedConnection
       if (block.isCollapsed()) {
         // This block should only be partially revealed since it is collapsed.
         connections = [];
-        if (block.outputConnection) connections.push(block.outputConnection);
-        if (block.nextConnection) connections.push(block.nextConnection);
-        if (block.previousConnection)
-          connections.push(block.previousConnection);
+        block.outputConnection && connections.push(block.outputConnection);
+        block.nextConnection && connections.push(block.nextConnection);
+        block.previousConnection && connections.push(block.previousConnection);
       } else {
         // Show all connections of this block.
         connections = block.getConnections_(true);
@@ -460,11 +412,11 @@ export class RenderedConnection
    * Bumps this connection away from the other connection. Called when an
    * attempted connection fails.
    *
-   * @param superiorConnection Connection that this connection failed to connect
-   *     to. The provided connection should be the superior connection.
+   * @param otherConnection Connection that this connection failed to connect
+   *     to.
    * @internal
    */
-  override onFailedConnect(superiorConnection: Connection) {
+  override onFailedConnect(otherConnection: Connection) {
     const block = this.getSourceBlock();
     if (eventUtils.getRecordUndo()) {
       const group = eventUtils.getGroup();
@@ -472,7 +424,7 @@ export class RenderedConnection
         function (this: RenderedConnection) {
           if (!block.isDisposed() && !block.getParent()) {
             eventUtils.setGroup(group);
-            this.bumpAwayFrom(superiorConnection as RenderedConnection);
+            this.bumpAwayFrom(otherConnection as RenderedConnection);
             eventUtils.setGroup(false);
           }
         }.bind(this),
@@ -493,20 +445,19 @@ export class RenderedConnection
     const {parentConnection, childConnection} =
       this.getParentAndChildConnections();
     if (!parentConnection || !childConnection) return;
-    const existingGroup = eventUtils.getGroup();
-    if (!existingGroup) eventUtils.setGroup(true);
-
     const parent = parentConnection.getSourceBlock() as BlockSvg;
     const child = childConnection.getSourceBlock() as BlockSvg;
     super.disconnectInternal(setParent);
-
-    parent.queueRender();
-    child.updateDisabled();
-    child.queueRender();
-    // Reset visibility, since the child is now a top block.
-    child.getSvgRoot().style.display = 'block';
-
-    eventUtils.setGroup(existingGroup);
+    // Rerender the parent so that it may reflow.
+    if (parent.rendered) {
+      parent.queueRender();
+    }
+    if (child.rendered) {
+      child.updateDisabled();
+      child.queueRender();
+      // Reset visibility, since the child is now a top block.
+      child.getSvgRoot().style.display = 'block';
+    }
   }
 
   /**
@@ -549,10 +500,29 @@ export class RenderedConnection
 
     const parentBlock = this.getSourceBlock();
     const childBlock = renderedChildConnection.getSourceBlock();
+    const parentRendered = parentBlock.rendered;
+    const childRendered = childBlock.rendered;
 
-    parentBlock.updateDisabled();
-    childBlock.updateDisabled();
-    childBlock.queueRender();
+    if (parentRendered) {
+      parentBlock.updateDisabled();
+    }
+    if (childRendered) {
+      childBlock.updateDisabled();
+    }
+    if (parentRendered && childRendered) {
+      if (
+        this.type === ConnectionType.NEXT_STATEMENT ||
+        this.type === ConnectionType.PREVIOUS_STATEMENT
+      ) {
+        // Child block may need to square off its corners if it is in a stack.
+        // Rendering a child will render its parent.
+        childBlock.queueRender();
+      } else {
+        // Child block does not change shape.  Rendering the parent node will
+        // move its connected children into position.
+        parentBlock.queueRender();
+      }
+    }
 
     // The input the child block is connected to (if any).
     const parentInput = parentBlock.getInputWithBlock(childBlock);
@@ -578,6 +548,8 @@ export class RenderedConnection
     ) {
       const child = this.isSuperior() ? this.targetBlock() : this.sourceBlock_;
       child!.unplug();
+      // Bump away.
+      this.sourceBlock_.bumpNeighbours();
     }
   }
 
@@ -591,77 +563,10 @@ export class RenderedConnection
    */
   override setCheck(check: string | string[] | null): RenderedConnection {
     super.setCheck(check);
-    this.sourceBlock_.queueRender();
-    return this;
-  }
-
-  /**
-   * Handles showing the context menu when it is opened on a connection.
-   * Note that typically the context menu can't be opened with the mouse
-   * on a connection, because you can't select a connection. But keyboard
-   * users may open the context menu with a keyboard shortcut.
-   *
-   * @param e Event that triggered the opening of the context menu.
-   */
-  showContextMenu(e: Event): void {
-    const menuOptions = ContextMenuRegistry.registry.getContextMenuOptions(
-      {focusedNode: this},
-      e,
-    );
-
-    if (!menuOptions.length) return;
-
-    const block = this.getSourceBlock();
-    const workspace = block.workspace;
-
-    let location;
-    if (e instanceof PointerEvent) {
-      location = new Coordinate(e.clientX, e.clientY);
-    } else {
-      const connectionWSCoords = new Coordinate(this.x, this.y);
-      const connectionScreenCoords = svgMath.wsToScreenCoordinates(
-        workspace,
-        connectionWSCoords,
-      );
-      location = connectionScreenCoords.translate(block.RTL ? -5 : 5, 5);
+    if (this.sourceBlock_.rendered) {
+      this.sourceBlock_.queueRender();
     }
-
-    ContextMenu.show(e, menuOptions, block.RTL, workspace, location);
-  }
-
-  /** See IFocusableNode.getFocusableElement. */
-  getFocusableElement(): HTMLElement | SVGElement {
-    const highlightSvg = this.findHighlightSvg();
-    if (highlightSvg) return highlightSvg;
-    throw new Error('No highlight SVG found corresponding to this connection.');
-  }
-
-  /** See IFocusableNode.getFocusableTree. */
-  getFocusableTree(): IFocusableTree {
-    return this.getSourceBlock().workspace as WorkspaceSvg;
-  }
-
-  /** See IFocusableNode.onNodeFocus. */
-  onNodeFocus(): void {
-    this.highlight();
-  }
-
-  /** See IFocusableNode.onNodeBlur. */
-  onNodeBlur(): void {
-    this.unhighlight();
-  }
-
-  /** See IFocusableNode.canBeFocused. */
-  canBeFocused(): boolean {
-    return true;
-  }
-
-  private findHighlightSvg(): SVGElement | null {
-    // This cast is valid as TypeScript's definition is wrong. See:
-    // https://github.com/microsoft/TypeScript/issues/60996.
-    return document.getElementById(this.id) as
-      | unknown
-      | null as SVGElement | null;
+    return this;
   }
 }
 

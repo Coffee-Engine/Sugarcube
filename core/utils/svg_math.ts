@@ -7,6 +7,7 @@
 // Former goog.module ID: Blockly.utils.svgMath
 
 import type {WorkspaceSvg} from '../workspace_svg.js';
+
 import {Coordinate} from './coordinate.js';
 import {Rect} from './rect.js';
 import * as style from './style.js';
@@ -61,7 +62,7 @@ export function getRelativeXY(element: Element): Coordinate {
 
   // Then check for style = transform: translate(...) or translate3d(...)
   const style = element.getAttribute('style');
-  if (style && style.includes('translate')) {
+  if (style && style.indexOf('translate') > -1) {
     const styleComponents = style.match(XY_STYLE_REGEX);
     if (styleComponents) {
       xy.x += Number(styleComponents[1]);
@@ -86,10 +87,10 @@ export function getInjectionDivXY(element: Element): Coordinate {
   let y = 0;
   while (element) {
     const xy = getRelativeXY(element);
-    x += xy.x;
-    y += xy.y;
+    x = x + xy.x;
+    y = y + xy.y;
     const classes = element.getAttribute('class') || '';
-    if ((' ' + classes + ' ').includes(' injectionDiv ')) {
+    if ((' ' + classes + ' ').indexOf(' injectionDiv ') !== -1) {
       break;
     }
     element = element.parentNode as Element;

@@ -11,21 +11,18 @@
  */
 // Former goog.module ID: Blockly.Events.VarCreate
 
-import type {
-  IVariableModel,
-  IVariableState,
-} from '../interfaces/i_variable_model.js';
 import * as registry from '../registry.js';
+import type {VariableModel} from '../variable_model.js';
 
-import type {Workspace} from '../workspace.js';
 import {VarBase, VarBaseJson} from './events_var_base.js';
-import {EventType} from './type.js';
+import * as eventUtils from './utils.js';
+import type {Workspace} from '../workspace.js';
 
 /**
  * Notifies listeners that a variable model has been created.
  */
 export class VarCreate extends VarBase {
-  override type = EventType.VAR_CREATE;
+  override type = eventUtils.VAR_CREATE;
 
   /** The type of the variable that was created. */
   varType?: string;
@@ -36,14 +33,14 @@ export class VarCreate extends VarBase {
   /**
    * @param opt_variable The created variable. Undefined for a blank event.
    */
-  constructor(opt_variable?: IVariableModel<IVariableState>) {
+  constructor(opt_variable?: VariableModel) {
     super(opt_variable);
 
     if (!opt_variable) {
       return; // Blank event to be populated by fromJson.
     }
-    this.varType = opt_variable.getType();
-    this.varName = opt_variable.getName();
+    this.varType = opt_variable.type;
+    this.varName = opt_variable.name;
   }
 
   /**
@@ -113,12 +110,10 @@ export class VarCreate extends VarBase {
           'the constructor, or call fromJson',
       );
     }
-    const variableMap = workspace.getVariableMap();
     if (forward) {
-      variableMap.createVariable(this.varName, this.varType, this.varId);
+      workspace.createVariable(this.varName, this.varType, this.varId);
     } else {
-      const variable = variableMap.getVariableById(this.varId);
-      if (variable) variableMap.deleteVariable(variable);
+      workspace.deleteVariableById(this.varId);
     }
   }
 }
@@ -128,4 +123,4 @@ export interface VarCreateJson extends VarBaseJson {
   varName: string;
 }
 
-registry.register(registry.Type.EVENT, EventType.VAR_CREATE, VarCreate);
+registry.register(registry.Type.EVENT, eventUtils.VAR_CREATE, VarCreate);

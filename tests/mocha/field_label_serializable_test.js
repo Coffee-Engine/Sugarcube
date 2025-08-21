@@ -5,11 +5,6 @@
  */
 
 import * as Blockly from '../../build/src/core/blockly.js';
-import {assert} from '../../node_modules/chai/chai.js';
-import {
-  createTestBlock,
-  defineRowBlock,
-} from './test_helpers/block_definitions.js';
 import {
   assertFieldValue,
   runConstructorSuiteTests,
@@ -21,6 +16,10 @@ import {
   sharedTestTeardown,
   workspaceTeardown,
 } from './test_helpers/setup_teardown.js';
+import {
+  createTestBlock,
+  defineRowBlock,
+} from './test_helpers/block_definitions.js';
 
 suite('Label Serializable Fields', function () {
   setup(function () {
@@ -138,7 +137,7 @@ suite('Label Serializable Fields', function () {
         FIELD_TEXT_BASELINE_Y: 13,
       };
       labelField.initView();
-      assert.isTrue(
+      chai.assert.isTrue(
         Blockly.utils.dom.hasClass(labelField.textElement_, cssClass),
       );
     }
@@ -152,7 +151,7 @@ suite('Label Serializable Fields', function () {
         FIELD_TEXT_BASELINE_Y: 13,
       };
       labelField.initView();
-      assert.isFalse(
+      chai.assert.isFalse(
         Blockly.utils.dom.hasClass(labelField.textElement_, cssClass),
       );
     }
@@ -205,7 +204,7 @@ suite('Label Serializable Fields', function () {
         field.initView();
         field.setClass('testClass');
         // Don't call assertHasClass b/c we don't want to re-initialize.
-        assert.isTrue(
+        chai.assert.isTrue(
           Blockly.utils.dom.hasClass(field.textElement_, 'testClass'),
         );
       });
@@ -220,7 +219,7 @@ suite('Label Serializable Fields', function () {
         });
         assertHasClass(field, 'testClass');
         field.setClass(null);
-        assert.isFalse(
+        chai.assert.isFalse(
           Blockly.utils.dom.hasClass(field.textElement_, 'testClass'),
         );
       });
@@ -237,7 +236,7 @@ suite('Label Serializable Fields', function () {
         const field = new Blockly.FieldLabelSerializable(value);
         block.getInput('INPUT').appendField(field, 'LABEL');
         const jso = Blockly.serialization.blocks.save(block);
-        assert.deepEqual(jso['fields'], {'LABEL': value});
+        chai.assert.deepEqual(jso['fields'], {'LABEL': value});
       };
     });
 

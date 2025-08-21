@@ -4,18 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../node_modules/chai/chai.js';
-import {
-  defineRowBlock,
-  defineStackBlock,
-  defineStatementBlock,
-} from './test_helpers/block_definitions.js';
 import {
   createGenUidStubWithReturns,
   sharedTestSetup,
   sharedTestTeardown,
   workspaceTeardown,
 } from './test_helpers/setup_teardown.js';
+import {
+  defineRowBlock,
+  defineStatementBlock,
+  defineStackBlock,
+} from './test_helpers/block_definitions.js';
 
 suite('Connection', function () {
   setup(function () {
@@ -40,19 +39,19 @@ suite('Connection', function () {
 
   suite('Set Shadow', function () {
     function assertBlockMatches(block, isShadow, opt_id) {
-      assert.equal(
+      chai.assert.equal(
         block.isShadow(),
         isShadow,
         `expected block ${block.id} to ${isShadow ? '' : 'not'} be a shadow`,
       );
       if (opt_id) {
-        assert.equal(block.id, opt_id);
+        chai.assert.equal(block.id, opt_id);
       }
     }
 
     function assertInputHasBlock(parent, inputName, isShadow, opt_name) {
       const block = parent.getInputTargetBlock(inputName);
-      assert.exists(
+      chai.assert.exists(
         block,
         `expected block ${opt_name || ''} to be attached to ${inputName}`,
       );
@@ -61,7 +60,7 @@ suite('Connection', function () {
 
     function assertNextHasBlock(parent, isShadow, opt_name) {
       const block = parent.getNextBlock();
-      assert.exists(
+      chai.assert.exists(
         block,
         `expected block ${opt_name || ''} to be attached to next connection`,
       );
@@ -70,7 +69,7 @@ suite('Connection', function () {
 
     function assertInputNotHasBlock(parent, inputName) {
       const block = parent.getInputTargetBlock(inputName);
-      assert.notExists(
+      chai.assert.notExists(
         block,
         `expected block ${
           block && block.id
@@ -80,7 +79,7 @@ suite('Connection', function () {
 
     function assertNextNotHasBlock(parent) {
       const block = parent.getNextBlock();
-      assert.notExists(
+      chai.assert.notExists(
         block,
         `expected block ${
           block && block.id
@@ -93,8 +92,8 @@ suite('Connection', function () {
         addNextBlocks: true,
       });
       const actualXml = Blockly.Xml.domToText(Blockly.Xml.blockToDom(block));
-      assert.deepEqual(actualJso, jso);
-      assert.equal(actualXml, xmlText);
+      chai.assert.deepEqual(actualJso, jso);
+      chai.assert.equal(actualXml, xmlText);
     }
 
     const testSuites = [
@@ -1383,7 +1382,7 @@ suite('Connection', function () {
           suite('Invalid', function () {
             test('Attach to output', function () {
               const block = this.workspace.newBlock('row_block');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block.outputConnection.setShadowDom(
                   Blockly.utils.xml.textToDom('<block type="row_block">'),
                 ),
@@ -1392,7 +1391,7 @@ suite('Connection', function () {
 
             test('Attach to previous', function () {
               const block = this.workspace.newBlock('stack_block');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block.previousConnection.setShadowDom(
                   Blockly.utils.xml.textToDom('<block type="stack_block">'),
                 ),
@@ -1401,7 +1400,7 @@ suite('Connection', function () {
 
             test('Missing output', function () {
               const block = this.workspace.newBlock('row_block');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block.outputConnection.setShadowDom(
                   Blockly.utils.xml.textToDom('<block type="stack_block">'),
                 ),
@@ -1410,7 +1409,7 @@ suite('Connection', function () {
 
             test('Missing previous', function () {
               const block = this.workspace.newBlock('stack_block');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block.previousConnection.setShadowDom(
                   Blockly.utils.xml.textToDom('<block type="row_block">'),
                 ),
@@ -1419,7 +1418,7 @@ suite('Connection', function () {
 
             test('Invalid connection checks, output', function () {
               const block = this.workspace.newBlock('logic_operation');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block
                   .getInput('A')
                   .connection.setShadowDom(
@@ -1438,7 +1437,7 @@ suite('Connection', function () {
                 },
               ]);
               const block = this.workspace.newBlock('stack_checks_block');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block.nextConnection.setShadowDom(
                   Blockly.utils.xml.textToDom(
                     '<block type="stack_checks_block">',
@@ -2752,14 +2751,14 @@ suite('Connection', function () {
           suite('Invalid', function () {
             test('Attach to output', function () {
               const block = this.workspace.newBlock('row_block');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block.outputConnection.setShadowState({'type': 'row_block'}),
               );
             });
 
             test('Attach to previous', function () {
               const block = this.workspace.newBlock('stack_block');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block.previousConnection.setShadowState({
                   'type': 'stack_block',
                 }),
@@ -2768,21 +2767,21 @@ suite('Connection', function () {
 
             test('Missing output', function () {
               const block = this.workspace.newBlock('row_block');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block.outputConnection.setShadowState({'type': 'stack_block'}),
               );
             });
 
             test('Missing previous', function () {
               const block = this.workspace.newBlock('stack_block');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block.previousConnection.setShadowState({'type': 'row_block'}),
               );
             });
 
             test('Invalid connection checks, output', function () {
               const block = this.workspace.newBlock('logic_operation');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block
                   .getInput('A')
                   .connection.setShadowState({'type': 'math_number'}),
@@ -2799,7 +2798,7 @@ suite('Connection', function () {
                 },
               ]);
               const block = this.workspace.newBlock('stack_checks_block');
-              assert.throws(() =>
+              chai.assert.throws(() =>
                 block.nextConnection.setShadowState({
                   'type': 'stack_checks_block',
                 }),
@@ -2985,7 +2984,7 @@ suite('Connection', function () {
 
       // Used to make sure we don't get stray shadow blocks or anything.
       this.assertBlockCount = function (count) {
-        assert.equal(this.workspace.getAllBlocks().length, count);
+        chai.assert.equal(this.workspace.getAllBlocks().length, count);
       };
     });
 
@@ -2998,7 +2997,9 @@ suite('Connection', function () {
         oldParent.getInput('INPUT').connection.connect(child.outputConnection);
         newParent.getInput('INPUT').connection.connect(child.outputConnection);
 
-        assert.isFalse(oldParent.getInput('INPUT').connection.isConnected());
+        chai.assert.isFalse(
+          oldParent.getInput('INPUT').connection.isConnected(),
+        );
         this.assertBlockCount(3);
       });
 
@@ -3010,7 +3011,9 @@ suite('Connection', function () {
         oldParent.getInput('NAME').connection.connect(child.previousConnection);
         newParent.getInput('NAME').connection.connect(child.previousConnection);
 
-        assert.isFalse(oldParent.getInput('NAME').connection.isConnected());
+        chai.assert.isFalse(
+          oldParent.getInput('NAME').connection.isConnected(),
+        );
         this.assertBlockCount(3);
       });
 
@@ -3022,7 +3025,7 @@ suite('Connection', function () {
         oldParent.nextConnection.connect(child.previousConnection);
         newParent.nextConnection.connect(child.previousConnection);
 
-        assert.isFalse(oldParent.nextConnection.isConnected());
+        chai.assert.isFalse(oldParent.nextConnection.isConnected());
         this.assertBlockCount(3);
       });
     });
@@ -3033,11 +3036,11 @@ suite('Connection', function () {
         const child = this.workspace.newBlock('row_block');
         const xml = Blockly.utils.xml.textToDom('<shadow type="row_block"/>');
         newParent.getInput('INPUT').connection.setShadowDom(xml);
-        assert.isTrue(newParent.getInputTargetBlock('INPUT').isShadow());
+        chai.assert.isTrue(newParent.getInputTargetBlock('INPUT').isShadow());
 
         newParent.getInput('INPUT').connection.connect(child.outputConnection);
 
-        assert.isFalse(newParent.getInputTargetBlock('INPUT').isShadow());
+        chai.assert.isFalse(newParent.getInputTargetBlock('INPUT').isShadow());
         this.assertBlockCount(2);
       });
 
@@ -3046,11 +3049,11 @@ suite('Connection', function () {
         const child = this.workspace.newBlock('stack_block');
         const xml = Blockly.utils.xml.textToDom('<shadow type="stack_block"/>');
         newParent.getInput('NAME').connection.setShadowDom(xml);
-        assert.isTrue(newParent.getInputTargetBlock('NAME').isShadow());
+        chai.assert.isTrue(newParent.getInputTargetBlock('NAME').isShadow());
 
         newParent.getInput('NAME').connection.connect(child.previousConnection);
 
-        assert.isFalse(newParent.getInputTargetBlock('NAME').isShadow());
+        chai.assert.isFalse(newParent.getInputTargetBlock('NAME').isShadow());
         this.assertBlockCount(2);
       });
 
@@ -3059,11 +3062,11 @@ suite('Connection', function () {
         const child = this.workspace.newBlock('stack_block');
         const xml = Blockly.utils.xml.textToDom('<shadow type="stack_block"/>');
         newParent.nextConnection.setShadowDom(xml);
-        assert.isTrue(newParent.getNextBlock().isShadow());
+        chai.assert.isTrue(newParent.getNextBlock().isShadow());
 
         newParent.nextConnection.connect(child.previousConnection);
 
-        assert.isFalse(newParent.getNextBlock().isShadow());
+        chai.assert.isFalse(newParent.getNextBlock().isShadow());
         this.assertBlockCount(2);
       });
     });
@@ -3080,8 +3083,8 @@ suite('Connection', function () {
         newParent.getInput('INPUT').connection.disconnect();
 
         const target = newParent.getInputTargetBlock('INPUT');
-        assert.isTrue(target.isShadow());
-        assert.equal(target.getFieldValue('FIELD'), 'new');
+        chai.assert.isTrue(target.isShadow());
+        chai.assert.equal(target.getFieldValue('FIELD'), 'new');
         this.assertBlockCount(3);
       });
 
@@ -3096,8 +3099,8 @@ suite('Connection', function () {
         newParent.getInput('NAME').connection.disconnect();
 
         const target = newParent.getInputTargetBlock('NAME');
-        assert.isTrue(target.isShadow());
-        assert.equal(target.getFieldValue('FIELD'), 'new');
+        chai.assert.isTrue(target.isShadow());
+        chai.assert.equal(target.getFieldValue('FIELD'), 'new');
         this.assertBlockCount(3);
       });
 
@@ -3112,8 +3115,8 @@ suite('Connection', function () {
         newParent.nextConnection.disconnect();
 
         const target = newParent.getNextBlock();
-        assert.isTrue(target.isShadow());
-        assert.equal(target.getFieldValue('FIELD'), 'new');
+        chai.assert.isTrue(target.isShadow());
+        chai.assert.equal(target.getFieldValue('FIELD'), 'new');
         this.assertBlockCount(3);
       });
     });
@@ -3133,9 +3136,11 @@ suite('Connection', function () {
               .getInput('INPUT')
               .connection.connect(newChild.outputConnection);
 
-            assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-            assert.isFalse(oldChild.outputConnection.isConnected());
+            chai.assert.isTrue(
+              parent.getInput('INPUT').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+            chai.assert.isFalse(oldChild.outputConnection.isConnected());
           });
 
           test('All statements', function () {
@@ -3150,9 +3155,11 @@ suite('Connection', function () {
               .getInput('INPUT')
               .connection.connect(newChild.outputConnection);
 
-            assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-            assert.isFalse(oldChild.outputConnection.isConnected());
+            chai.assert.isTrue(
+              parent.getInput('INPUT').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+            chai.assert.isFalse(oldChild.outputConnection.isConnected());
           });
 
           test('Bad checks', function () {
@@ -3167,9 +3174,11 @@ suite('Connection', function () {
               .getInput('INPUT')
               .connection.connect(newChild.outputConnection);
 
-            assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-            assert.isFalse(oldChild.outputConnection.isConnected());
+            chai.assert.isTrue(
+              parent.getInput('INPUT').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+            chai.assert.isFalse(oldChild.outputConnection.isConnected());
           });
 
           test('Through different types', function () {
@@ -3189,9 +3198,11 @@ suite('Connection', function () {
               .getInput('INPUT')
               .connection.connect(newChild.outputConnection);
 
-            assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-            assert.isFalse(oldChild.outputConnection.isConnected());
+            chai.assert.isTrue(
+              parent.getInput('INPUT').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+            chai.assert.isFalse(oldChild.outputConnection.isConnected());
           });
         });
 
@@ -3212,9 +3223,11 @@ suite('Connection', function () {
                 .getInput('INPUT')
                 .connection.connect(newChild.outputConnection);
 
-              assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-              assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-              assert.isFalse(oldChild.outputConnection.isConnected());
+              chai.assert.isTrue(
+                parent.getInput('INPUT').connection.isConnected(),
+              );
+              chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+              chai.assert.isFalse(oldChild.outputConnection.isConnected());
             });
 
             test('Child blocks', function () {
@@ -3240,9 +3253,11 @@ suite('Connection', function () {
                 .getInput('INPUT')
                 .connection.connect(newChild.outputConnection);
 
-              assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-              assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-              assert.isFalse(oldChild.outputConnection.isConnected());
+              chai.assert.isTrue(
+                parent.getInput('INPUT').connection.isConnected(),
+              );
+              chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+              chai.assert.isFalse(oldChild.outputConnection.isConnected());
             });
 
             test('Spots filled', function () {
@@ -3264,9 +3279,11 @@ suite('Connection', function () {
                 .getInput('INPUT')
                 .connection.connect(newChild.outputConnection);
 
-              assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-              assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-              assert.isFalse(oldChild.outputConnection.isConnected());
+              chai.assert.isTrue(
+                parent.getInput('INPUT').connection.isConnected(),
+              );
+              chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+              chai.assert.isFalse(oldChild.outputConnection.isConnected());
             });
           });
 
@@ -3300,9 +3317,11 @@ suite('Connection', function () {
                 .getInput('INPUT')
                 .connection.connect(newChild.outputConnection);
 
-              assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-              assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-              assert.isFalse(oldChild.outputConnection.isConnected());
+              chai.assert.isTrue(
+                parent.getInput('INPUT').connection.isConnected(),
+              );
+              chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+              chai.assert.isFalse(oldChild.outputConnection.isConnected());
             });
 
             test('Child blocks', function () {
@@ -3342,9 +3361,11 @@ suite('Connection', function () {
                 .getInput('INPUT')
                 .connection.connect(newChild.outputConnection);
 
-              assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-              assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-              assert.isFalse(oldChild.outputConnection.isConnected());
+              chai.assert.isTrue(
+                parent.getInput('INPUT').connection.isConnected(),
+              );
+              chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+              chai.assert.isFalse(oldChild.outputConnection.isConnected());
             });
 
             test('Spots filled', function () {
@@ -3373,9 +3394,11 @@ suite('Connection', function () {
                 .getInput('INPUT')
                 .connection.connect(newChild.outputConnection);
 
-              assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-              assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-              assert.isFalse(oldChild.outputConnection.isConnected());
+              chai.assert.isTrue(
+                parent.getInput('INPUT').connection.isConnected(),
+              );
+              chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+              chai.assert.isFalse(oldChild.outputConnection.isConnected());
             });
           });
         });
@@ -3394,10 +3417,14 @@ suite('Connection', function () {
               .getInput('INPUT')
               .connection.connect(newChild.outputConnection);
 
-            assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-            assert.isTrue(newChild.getInput('INPUT').connection.isConnected());
-            assert.equal(newChild.getInputTargetBlock('INPUT'), oldChild);
+            chai.assert.isTrue(
+              parent.getInput('INPUT').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+            chai.assert.isTrue(
+              newChild.getInput('INPUT').connection.isConnected(),
+            );
+            chai.assert.equal(newChild.getInputTargetBlock('INPUT'), oldChild);
           });
 
           test('Shadows', function () {
@@ -3420,10 +3447,14 @@ suite('Connection', function () {
               .getInput('INPUT')
               .connection.connect(newChild.outputConnection);
 
-            assert.isTrue(parent.getInput('INPUT').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
-            assert.isTrue(newChild.getInput('INPUT').connection.isConnected());
-            assert.equal(newChild.getInputTargetBlock('INPUT'), oldChild);
+            chai.assert.isTrue(
+              parent.getInput('INPUT').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('INPUT'), newChild);
+            chai.assert.isTrue(
+              newChild.getInput('INPUT').connection.isConnected(),
+            );
+            chai.assert.equal(newChild.getInputTargetBlock('INPUT'), oldChild);
           });
         });
       });
@@ -3442,10 +3473,12 @@ suite('Connection', function () {
               .getInput('NAME')
               .connection.connect(newChild.previousConnection);
 
-            assert.isTrue(parent.getInput('NAME').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('NAME'), newChild);
-            assert.isTrue(newChild.nextConnection.isConnected());
-            assert.equal(newChild.getNextBlock(), oldChild);
+            chai.assert.isTrue(
+              parent.getInput('NAME').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('NAME'), newChild);
+            chai.assert.isTrue(newChild.nextConnection.isConnected());
+            chai.assert.equal(newChild.getNextBlock(), oldChild);
             this.assertBlockCount(3);
           });
 
@@ -3463,10 +3496,12 @@ suite('Connection', function () {
               .getInput('NAME')
               .connection.connect(newChild1.previousConnection);
 
-            assert.isTrue(parent.getInput('NAME').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('NAME'), newChild1);
-            assert.isTrue(newChild2.nextConnection.isConnected());
-            assert.equal(newChild2.getNextBlock(), oldChild);
+            chai.assert.isTrue(
+              parent.getInput('NAME').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('NAME'), newChild1);
+            chai.assert.isTrue(newChild2.nextConnection.isConnected());
+            chai.assert.equal(newChild2.getNextBlock(), oldChild);
             this.assertBlockCount(4);
           });
 
@@ -3486,10 +3521,12 @@ suite('Connection', function () {
               .getInput('NAME')
               .connection.connect(newChild.previousConnection);
 
-            assert.isTrue(parent.getInput('NAME').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('NAME'), newChild);
-            assert.isFalse(newChild.nextConnection.isConnected());
-            assert.isTrue(spy.calledOnce);
+            chai.assert.isTrue(
+              parent.getInput('NAME').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('NAME'), newChild);
+            chai.assert.isFalse(newChild.nextConnection.isConnected());
+            chai.assert.isTrue(spy.calledOnce);
             this.assertBlockCount(3);
           });
 
@@ -3509,9 +3546,11 @@ suite('Connection', function () {
               .getInput('NAME')
               .connection.connect(newChild.previousConnection);
 
-            assert.isTrue(parent.getInput('NAME').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('NAME'), newChild);
-            assert.isTrue(spy.calledOnce);
+            chai.assert.isTrue(
+              parent.getInput('NAME').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('NAME'), newChild);
+            chai.assert.isTrue(spy.calledOnce);
             this.assertBlockCount(3);
           });
         });
@@ -3533,10 +3572,12 @@ suite('Connection', function () {
               .getInput('NAME')
               .connection.connect(newChild.previousConnection);
 
-            assert.isTrue(parent.getInput('NAME').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('NAME'), newChild);
-            assert.isTrue(newChild.nextConnection.isConnected());
-            assert.equal(newChild.getNextBlock(), oldChild);
+            chai.assert.isTrue(
+              parent.getInput('NAME').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('NAME'), newChild);
+            chai.assert.isTrue(newChild.nextConnection.isConnected());
+            chai.assert.equal(newChild.getNextBlock(), oldChild);
             this.assertBlockCount(3);
           });
 
@@ -3558,10 +3599,12 @@ suite('Connection', function () {
               .getInput('NAME')
               .connection.connect(newChild1.previousConnection);
 
-            assert.isTrue(parent.getInput('NAME').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('NAME'), newChild1);
-            assert.isTrue(newChild2.nextConnection.isConnected());
-            assert.equal(newChild2.getNextBlock(), oldChild);
+            chai.assert.isTrue(
+              parent.getInput('NAME').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('NAME'), newChild1);
+            chai.assert.isTrue(newChild2.nextConnection.isConnected());
+            chai.assert.equal(newChild2.getNextBlock(), oldChild);
             this.assertBlockCount(4);
           });
 
@@ -3585,11 +3628,13 @@ suite('Connection', function () {
               .getInput('NAME')
               .connection.connect(newChild.previousConnection);
 
-            assert.isTrue(parent.getInput('NAME').connection.isConnected());
-            assert.equal(parent.getInputTargetBlock('NAME'), newChild);
-            assert.isTrue(newChild.nextConnection.isConnected());
-            assert.isTrue(newChild.getNextBlock().isShadow());
-            assert.isTrue(spy.calledOnce);
+            chai.assert.isTrue(
+              parent.getInput('NAME').connection.isConnected(),
+            );
+            chai.assert.equal(parent.getInputTargetBlock('NAME'), newChild);
+            chai.assert.isTrue(newChild.nextConnection.isConnected());
+            chai.assert.isTrue(newChild.getNextBlock().isShadow());
+            chai.assert.isTrue(spy.calledOnce);
             this.assertBlockCount(4);
           });
         });
@@ -3605,10 +3650,10 @@ suite('Connection', function () {
 
             parent.nextConnection.connect(newChild.previousConnection);
 
-            assert.isTrue(parent.nextConnection.isConnected());
-            assert.equal(parent.getNextBlock(), newChild);
-            assert.isTrue(newChild.nextConnection.isConnected());
-            assert.equal(newChild.getNextBlock(), oldChild);
+            chai.assert.isTrue(parent.nextConnection.isConnected());
+            chai.assert.equal(parent.getNextBlock(), newChild);
+            chai.assert.isTrue(newChild.nextConnection.isConnected());
+            chai.assert.equal(newChild.getNextBlock(), oldChild);
             this.assertBlockCount(3);
           });
 
@@ -3622,10 +3667,10 @@ suite('Connection', function () {
 
             parent.nextConnection.connect(newChild1.previousConnection);
 
-            assert.isTrue(parent.nextConnection.isConnected());
-            assert.equal(parent.getNextBlock(), newChild1);
-            assert.isTrue(newChild2.nextConnection.isConnected());
-            assert.equal(newChild2.getNextBlock(), oldChild);
+            chai.assert.isTrue(parent.nextConnection.isConnected());
+            chai.assert.equal(parent.getNextBlock(), newChild1);
+            chai.assert.isTrue(newChild2.nextConnection.isConnected());
+            chai.assert.equal(newChild2.getNextBlock(), oldChild);
             this.assertBlockCount(4);
           });
 
@@ -3641,10 +3686,10 @@ suite('Connection', function () {
 
             parent.nextConnection.connect(newChild.previousConnection);
 
-            assert.isTrue(parent.nextConnection.isConnected());
-            assert.equal(parent.getNextBlock(), newChild);
-            assert.isFalse(newChild.nextConnection.isConnected());
-            assert.isTrue(spy.calledOnce);
+            chai.assert.isTrue(parent.nextConnection.isConnected());
+            chai.assert.equal(parent.getNextBlock(), newChild);
+            chai.assert.isFalse(newChild.nextConnection.isConnected());
+            chai.assert.isTrue(spy.calledOnce);
             this.assertBlockCount(3);
           });
 
@@ -3660,9 +3705,9 @@ suite('Connection', function () {
 
             parent.nextConnection.connect(newChild.previousConnection);
 
-            assert.isTrue(parent.nextConnection.isConnected());
-            assert.equal(parent.getNextBlock(), newChild);
-            assert.isTrue(spy.calledOnce);
+            chai.assert.isTrue(parent.nextConnection.isConnected());
+            chai.assert.equal(parent.getNextBlock(), newChild);
+            chai.assert.isTrue(spy.calledOnce);
             this.assertBlockCount(3);
           });
         });
@@ -3680,10 +3725,10 @@ suite('Connection', function () {
 
             parent.nextConnection.connect(newChild.previousConnection);
 
-            assert.isTrue(parent.nextConnection.isConnected());
-            assert.equal(parent.getNextBlock(), newChild);
-            assert.isTrue(newChild.nextConnection.isConnected());
-            assert.equal(newChild.getNextBlock(), oldChild);
+            chai.assert.isTrue(parent.nextConnection.isConnected());
+            chai.assert.equal(parent.getNextBlock(), newChild);
+            chai.assert.isTrue(newChild.nextConnection.isConnected());
+            chai.assert.equal(newChild.getNextBlock(), oldChild);
             this.assertBlockCount(3);
           });
 
@@ -3701,10 +3746,10 @@ suite('Connection', function () {
 
             parent.nextConnection.connect(newChild1.previousConnection);
 
-            assert.isTrue(parent.nextConnection.isConnected());
-            assert.equal(parent.getNextBlock(), newChild1);
-            assert.isTrue(newChild2.nextConnection.isConnected());
-            assert.equal(newChild2.getNextBlock(), oldChild);
+            chai.assert.isTrue(parent.nextConnection.isConnected());
+            chai.assert.equal(parent.getNextBlock(), newChild1);
+            chai.assert.isTrue(newChild2.nextConnection.isConnected());
+            chai.assert.equal(newChild2.getNextBlock(), oldChild);
             this.assertBlockCount(4);
           });
 
@@ -3724,11 +3769,11 @@ suite('Connection', function () {
 
             parent.nextConnection.connect(newChild.previousConnection);
 
-            assert.isTrue(parent.nextConnection.isConnected());
-            assert.equal(parent.getNextBlock(), newChild);
-            assert.isTrue(newChild.nextConnection.isConnected());
-            assert.isTrue(newChild.getNextBlock().isShadow());
-            assert.isTrue(spy.calledOnce);
+            chai.assert.isTrue(parent.nextConnection.isConnected());
+            chai.assert.equal(parent.getNextBlock(), newChild);
+            chai.assert.isTrue(newChild.nextConnection.isConnected());
+            chai.assert.isTrue(newChild.getNextBlock().isShadow());
+            chai.assert.isTrue(spy.calledOnce);
             this.assertBlockCount(4);
           });
         });

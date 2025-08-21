@@ -6,6 +6,6 @@ var msg = 'Compiled Blockly files should be loaded from https://unpkg.com/blockl
 console.log(msg);
 try {
   alert(msg);
-} catch {
+} catch (_e) {
   // Can't alert?  Probably node.js.
 }

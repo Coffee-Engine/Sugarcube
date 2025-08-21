@@ -41,8 +41,7 @@ export class MenuItem {
   private highlight = false;
 
   /** Bound function to call when this menu item is clicked. */
-  private actionHandler: ((obj: this, menuSelectEvent: Event) => void) | null =
-    null;
+  private actionHandler: Function | null = null;
 
   /**
    * @param content Text caption to display as the content of the item, or a
@@ -65,19 +64,22 @@ export class MenuItem {
     this.element = element;
 
     // Set class and style
+    // goog-menuitem* is deprecated, use blocklyMenuItem*.  May 2020.
     element.className =
-      'blocklyMenuItem ' +
-      (this.enabled ? '' : 'blocklyMenuItemDisabled ') +
-      (this.checked ? 'blocklyMenuItemSelected ' : '') +
-      (this.highlight ? 'blocklyMenuItemHighlight ' : '') +
-      (this.rightToLeft ? 'blocklyMenuItemRtl ' : '');
+      'blocklyMenuItem goog-menuitem ' +
+      (this.enabled ? '' : 'blocklyMenuItemDisabled goog-menuitem-disabled ') +
+      (this.checked ? 'blocklyMenuItemSelected goog-option-selected ' : '') +
+      (this.highlight
+        ? 'blocklyMenuItemHighlight goog-menuitem-highlight '
+        : '') +
+      (this.rightToLeft ? 'blocklyMenuItemRtl goog-menuitem-rtl ' : '');
 
     const content = document.createElement('div');
-    content.className = 'blocklyMenuItemContent';
+    content.className = 'blocklyMenuItemContent goog-menuitem-content';
     // Add a checkbox for checkable menu items.
     if (this.checkable) {
       const checkbox = document.createElement('div');
-      checkbox.className = 'blocklyMenuItemCheckbox ';
+      checkbox.className = 'blocklyMenuItemCheckbox goog-menuitem-checkbox';
       content.appendChild(checkbox);
     }
 
@@ -186,13 +188,19 @@ export class MenuItem {
    */
   setHighlighted(highlight: boolean) {
     this.highlight = highlight;
+
     const el = this.getElement();
     if (el && this.isEnabled()) {
+      // goog-menuitem-highlight is deprecated, use blocklyMenuItemHighlight.
+      // May 2020.
       const name = 'blocklyMenuItemHighlight';
+      const nameDep = 'goog-menuitem-highlight';
       if (highlight) {
         dom.addClass(el, name);
+        dom.addClass(el, nameDep);
       } else {
         dom.removeClass(el, name);
+        dom.removeClass(el, nameDep);
       }
     }
   }
@@ -221,14 +229,11 @@ export class MenuItem {
    * Performs the appropriate action when the menu item is activated
    * by the user.
    *
-   * @param menuSelectEvent the event that triggered the selection
-   * of the menu item.
-   *
    * @internal
    */
-  performAction(menuSelectEvent: Event) {
+  performAction() {
     if (this.isEnabled() && this.actionHandler) {
-      this.actionHandler(this, menuSelectEvent);
+      this.actionHandler(this);
     }
   }
 
@@ -240,7 +245,7 @@ export class MenuItem {
    * @param obj Used as the 'this' object in fn when called.
    * @internal
    */
-  onAction(fn: (p1: MenuItem, menuSelectEvent: Event) => void, obj: object) {
+  onAction(fn: (p1: MenuItem) => void, obj: object) {
     this.actionHandler = fn.bind(obj);
   }
 }

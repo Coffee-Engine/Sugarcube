@@ -10,7 +10,6 @@ import {JavascriptGenerator} from '../../build/src/generators/javascript/javascr
 import {LuaGenerator} from '../../build/src/generators/lua/lua_generator.js';
 import {PhpGenerator} from '../../build/src/generators/php/php_generator.js';
 import {PythonGenerator} from '../../build/src/generators/python/python_generator.js';
-import {assert} from '../../node_modules/chai/chai.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
@@ -32,19 +31,22 @@ suite('Generator', function () {
     });
 
     test('Nothing', function () {
-      assert.equal(this.generator.prefixLines('', ''), '');
+      chai.assert.equal(this.generator.prefixLines('', ''), '');
     });
 
     test('One word', function () {
-      assert.equal(this.generator.prefixLines('Hello', '@'), '@Hello');
+      chai.assert.equal(this.generator.prefixLines('Hello', '@'), '@Hello');
     });
 
     test('One line', function () {
-      assert.equal(this.generator.prefixLines('Hello\n', '12'), '12Hello\n');
+      chai.assert.equal(
+        this.generator.prefixLines('Hello\n', '12'),
+        '12Hello\n',
+      );
     });
 
     test('Two lines', function () {
-      assert.equal(
+      chai.assert.equal(
         this.generator.prefixLines('Hello\nWorld\n', '***'),
         '***Hello\n***World\n',
       );
@@ -90,12 +92,12 @@ suite('Generator', function () {
           return 'stack_block';
         };
         rowBlock.nextConnection.connect(stackBlock.previousConnection);
-        rowBlock.setDisabledReason(blockDisabled, 'test reason');
+        rowBlock.disabled = blockDisabled;
 
         const code = generator.blockToCode(rowBlock, opt_thisOnly);
         delete generator.forBlock['stack_block'];
         delete generator.forBlock['row_block'];
-        assert.equal(code, expectedCode, opt_message);
+        chai.assert.equal(code, expectedCode, opt_message);
       };
     });
 
@@ -113,16 +115,11 @@ suite('Generator', function () {
         const name = testCase[1];
         test(name, function () {
           generator.init(this.workspace);
+          this.blockToCodeTest(generator, false, true, 'row_block');
           this.blockToCodeTest(
             generator,
-            /* blockDisabled = */ false,
-            /* opt_thisOnly = */ true,
-            'row_block',
-          );
-          this.blockToCodeTest(
-            generator,
-            /* blockDisabled = */ false,
-            /* opt_thisOnly = */ false,
+            false,
+            false,
             'row_blockstack_block',
             'thisOnly=false',
           );
@@ -135,16 +132,11 @@ suite('Generator', function () {
         const generator = testCase[0];
         const name = testCase[1];
         test(name, function () {
+          this.blockToCodeTest(generator, true, true, '');
           this.blockToCodeTest(
             generator,
-            /* blockDisabled = */ true,
-            /* opt_thisOnly = */ true,
-            '',
-          );
-          this.blockToCodeTest(
-            generator,
-            /* blockDisabled = */ true,
-            /* opt_thisOnly = */ false,
+            true,
+            false,
             'stack_block',
             'thisOnly=false',
           );
@@ -185,7 +177,7 @@ suite('Generator', function () {
           blockA.nextConnection.connect(blockC.previousConnection);
 
           const code = generator.blockToCode(blockA, opt_thisOnly);
-          assert.equal(code, expectedCode, opt_message);
+          chai.assert.equal(code, expectedCode, opt_message);
         };
       });
 
@@ -212,7 +204,7 @@ suite('Generator', function () {
         this.generator = new TestGenerator();
       });
       test('No nameDB_ initialized', function () {
-        assert.throws(() => {
+        chai.assert.throws(() => {
           this.generator.getVariableName('foo');
         });
       });
@@ -220,13 +212,13 @@ suite('Generator', function () {
       test('Get variable name', function () {
         this.generator.init();
 
-        assert.equal(this.generator.getVariableName('foo'), 'foo');
+        chai.assert.equal(this.generator.getVariableName('foo'), 'foo');
       });
 
       test('Get procedure name', function () {
         this.generator.init();
 
-        assert.equal(this.generator.getProcedureName('foo'), 'foo');
+        chai.assert.equal(this.generator.getProcedureName('foo'), 'foo');
       });
     });
   });

@@ -4,14 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {ConnectionType} from '../../../build/src/core/connection_type.js';
-import {assert} from '../../../node_modules/chai/chai.js';
-import {defineStatementBlock} from '../test_helpers/block_definitions.js';
 import {runSerializationTestSuite} from '../test_helpers/serialization.js';
 import {
   sharedTestSetup,
   sharedTestTeardown,
 } from '../test_helpers/setup_teardown.js';
+import {ConnectionType} from '../../../build/src/core/connection_type.js';
+import {defineStatementBlock} from '../test_helpers/block_definitions.js';
 
 suite('Lists', function () {
   setup(function () {
@@ -38,8 +37,8 @@ suite('Lists', function () {
           fields: {MODE: 'GET', WHERE: 'FIRST'},
         },
         assertBlockStructure: (block) => {
-          assert.equal(block.type, 'lists_getIndex');
-          assert.exists(block.outputConnection);
+          chai.assert.equal(block.type, 'lists_getIndex');
+          chai.assert.exists(block.outputConnection);
         },
       },
       {
@@ -51,9 +50,9 @@ suite('Lists', function () {
           fields: {MODE: 'REMOVE', WHERE: 'FROM_START'},
         },
         assertBlockStructure: (block) => {
-          assert.equal(block.type, 'lists_getIndex');
-          assert.isNotTrue(block.outputConnection);
-          assert.isTrue(
+          chai.assert.equal(block.type, 'lists_getIndex');
+          chai.assert.isNotTrue(block.outputConnection);
+          chai.assert.isTrue(
             block.getInput('AT').type === ConnectionType.INPUT_VALUE,
           );
         },
@@ -123,7 +122,7 @@ suite('Lists', function () {
         title: 'JSON not requiring mutations',
         json: serializedJson,
         assertBlockStructure: (block) => {
-          assert.equal(block.type, serializedJson.type);
+          chai.assert.equal(block.type, serializedJson.type);
         },
       },
       {
@@ -181,58 +180,16 @@ suite('Lists', function () {
      * Test cases for serialization tests.
      * @type {Array<SerializationTestCase>}
      */
-    const testCases = [
+    const testCases = makeTestCasesForBlockNotNeedingExtraState_(
       {
-        title: 'JSON for splitting',
-        json: {
-          type: 'lists_split',
-          id: '1',
-          extraState: {mode: 'SPLIT'},
-          fields: {MODE: 'SPLIT'},
-          inputs: {
-            DELIM: {
-              shadow: {
-                type: 'text',
-                id: '2',
-                fields: {
-                  TEXT: ',',
-                },
-              },
-            },
-          },
-        },
-        assertBlockStructure: (block) => {
-          assert.equal(block.type, 'lists_split');
-          assert.deepEqual(block.outputConnection.getCheck(), ['Array']);
-          assert.isTrue(block.getField('MODE').getValue() === 'SPLIT');
+        'type': 'lists_split',
+        'id': '1',
+        'fields': {
+          'MODE': 'SPLIT',
         },
       },
-      {
-        title: 'JSON for joining',
-        json: {
-          type: 'lists_split',
-          id: '1',
-          extraState: {mode: 'JOIN'},
-          fields: {MODE: 'JOIN'},
-          inputs: {
-            DELIM: {
-              shadow: {
-                type: 'text',
-                id: '2',
-                fields: {
-                  TEXT: ',',
-                },
-              },
-            },
-          },
-        },
-        assertBlockStructure: (block) => {
-          assert.equal(block.type, 'lists_split');
-          assert.deepEqual(block.outputConnection.getCheck(), ['String']);
-          assert.isTrue(block.getField('MODE').getValue() === 'JOIN');
-        },
-      },
-    ];
+      '<mutation mode="SPLIT"></mutation>',
+    );
     runSerializationTestSuite(testCases);
   });
 });

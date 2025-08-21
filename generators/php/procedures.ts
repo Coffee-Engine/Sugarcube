@@ -10,12 +10,12 @@
 
 // Former goog.module ID: Blockly.PHP.procedures
 
-import type {IfReturnBlock} from '../../blocks/procedures.js';
-import type {Block} from '../../core/block.js';
-import {NameType} from '../../core/names.js';
 import * as Variables from '../../core/variables.js';
-import type {PhpGenerator} from './php_generator.js';
+import type {Block} from '../../core/block.js';
+import type {IfReturnBlock} from '../../blocks/procedures.js';
+import {NameType} from '../../core/names.js';
 import {Order} from './php_generator.js';
+import type {PhpGenerator} from './php_generator.js';
 
 export function procedures_defreturn(block: Block, generator: PhpGenerator) {
   // Define a procedure with a return value.
@@ -25,9 +25,9 @@ export function procedures_defreturn(block: Block, generator: PhpGenerator) {
   const workspace = block.workspace;
   const usedVariables = Variables.allUsedVarModels(workspace) || [];
   for (const variable of usedVariables) {
-    const varName = variable.getName();
+    const varName = variable.name;
     // getVars returns parameter names, not ids, for procedure blocks
-    if (!block.getVars().includes(varName)) {
+    if (block.getVars().indexOf(varName) === -1) {
       globals.push(generator.getVariableName(varName));
     }
   }
@@ -60,17 +60,8 @@ export function procedures_defreturn(block: Block, generator: PhpGenerator) {
       generator.INDENT,
     );
   }
-  let branch = '';
-  if (block.getInput('STACK')) {
-    // The 'procedures_defreturn' block might not have a STACK input.
-    branch = generator.statementToCode(block, 'STACK');
-  }
-  let returnValue = '';
-  if (block.getInput('RETURN')) {
-    // The 'procedures_defnoreturn' block (which shares this code)
-    // does not have a RETURN input.
-    returnValue = generator.valueToCode(block, 'RETURN', Order.NONE) || '';
-  }
+  const branch = generator.statementToCode(block, 'STACK');
+  let returnValue = generator.valueToCode(block, 'RETURN', Order.NONE) || '';
   let xfix2 = '';
   if (branch && returnValue) {
     // After executing the function body, revisit this block for the return.

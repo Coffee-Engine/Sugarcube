@@ -4,17 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Coordinate} from '../utils/coordinate.js';
 // Former goog.module ID: Blockly.IBubble
 
-import type {Coordinate} from '../utils/coordinate.js';
 import type {IContextMenu} from './i_contextmenu.js';
 import type {IDraggable} from './i_draggable.js';
-import {IFocusableNode} from './i_focusable_node.js';
 
 /**
  * A bubble interface.
  */
-export interface IBubble extends IDraggable, IContextMenu, IFocusableNode {
+export interface IBubble extends IDraggable, IContextMenu {
   /**
    * Return the coordinates of the top-left corner of this bubble's body
    * relative to the drawing surface's origin (0,0), in workspace units.

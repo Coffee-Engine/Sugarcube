@@ -6,42 +6,30 @@
 
 // Former goog.module ID: Blockly.dialog
 
-import type {ToastOptions} from './toast.js';
-import {Toast} from './toast.js';
-import type {WorkspaceSvg} from './workspace_svg.js';
-
-const defaultAlert = function (message: string, opt_callback?: () => void) {
+let alertImplementation = function (
+  message: string,
+  opt_callback?: () => void,
+) {
   window.alert(message);
   if (opt_callback) {
     opt_callback();
   }
 };
 
-let alertImplementation = defaultAlert;
-
-const defaultConfirm = function (
+let confirmImplementation = function (
   message: string,
   callback: (result: boolean) => void,
 ) {
   callback(window.confirm(message));
 };
 
-let confirmImplementation = defaultConfirm;
-
-const defaultPrompt = function (
+let promptImplementation = function (
   message: string,
   defaultValue: string,
   callback: (result: string | null) => void,
 ) {
-  // NOTE TO DEVELOPER: Ephemeral focus doesn't need to be taken for the native
-  // window prompt since it prevents focus from changing while open.
   callback(window.prompt(message, defaultValue));
 };
-
-let promptImplementation = defaultPrompt;
-
-const defaultToast = Toast.show.bind(Toast);
-let toastImplementation = defaultToast;
 
 /**
  * Wrapper to window.alert() that app developers may override via setAlert to
@@ -57,16 +45,10 @@ export function alert(message: string, opt_callback?: () => void) {
 /**
  * Sets the function to be run when Blockly.dialog.alert() is called.
  *
- * @param alertFunction The function to be run, or undefined to restore the
- *     default implementation.
+ * @param alertFunction The function to be run.
  * @see Blockly.dialog.alert
  */
-export function setAlert(
-  alertFunction: (
-    message: string,
-    callback?: () => void,
-  ) => void = defaultAlert,
-) {
+export function setAlert(alertFunction: (p1: string, p2?: () => void) => void) {
   alertImplementation = alertFunction;
 }
 
@@ -77,22 +59,25 @@ export function setAlert(
  * @param message The message to display to the user.
  * @param callback The callback for handling user response.
  */
-export function confirm(message: string, callback: (result: boolean) => void) {
+export function confirm(message: string, callback: (p1: boolean) => void) {
+  TEST_ONLY.confirmInternal(message, callback);
+}
+
+/**
+ * Private version of confirm for stubbing in tests.
+ */
+function confirmInternal(message: string, callback: (p1: boolean) => void) {
   confirmImplementation(message, callback);
 }
 
 /**
  * Sets the function to be run when Blockly.dialog.confirm() is called.
  *
- * @param confirmFunction The function to be run, or undefined to restore the
- *     default implementation.
+ * @param confirmFunction The function to be run.
  * @see Blockly.dialog.confirm
  */
 export function setConfirm(
-  confirmFunction: (
-    message: string,
-    callback: (result: boolean) => void,
-  ) => void = defaultConfirm,
+  confirmFunction: (p1: string, p2: (p1: boolean) => void) => void,
 ) {
   confirmImplementation = confirmFunction;
 }
@@ -110,7 +95,7 @@ export function setConfirm(
 export function prompt(
   message: string,
   defaultValue: string,
-  callback: (result: string | null) => void,
+  callback: (p1: string | null) => void,
 ) {
   promptImplementation(message, defaultValue, callback);
 }
@@ -118,50 +103,19 @@ export function prompt(
 /**
  * Sets the function to be run when Blockly.dialog.prompt() is called.
  *
- * **Important**: When overridding this, be aware that non-native prompt
- * experiences may require managing ephemeral focus in FocusManager. This isn't
- * needed for the native window prompt because it prevents focus from being
- * changed while open.
- *
- * @param promptFunction The function to be run, or undefined to restore the
- *     default implementation.
+ * @param promptFunction The function to be run.
  * @see Blockly.dialog.prompt
  */
 export function setPrompt(
   promptFunction: (
-    message: string,
-    defaultValue: string,
-    callback: (result: string | null) => void,
-  ) => void = defaultPrompt,
+    p1: string,
+    p2: string,
+    p3: (p1: string | null) => void,
+  ) => void,
 ) {
   promptImplementation = promptFunction;
 }
 
-/**
- * Displays a temporary notification atop the workspace. Blockly provides a
- * default toast implementation, but developers may provide their own via
- * setToast. For simple appearance customization, CSS should be sufficient.
- *
- * @param workspace The workspace to display the toast notification atop.
- * @param options Configuration options for the notification, including its
- *     message and duration.
- */
-export function toast(workspace: WorkspaceSvg, options: ToastOptions) {
-  toastImplementation(workspace, options);
-}
-
-/**
- * Sets the function to be run when Blockly.dialog.toast() is called.
- *
- * @param toastFunction The function to be run, or undefined to restore the
- *     default implementation.
- * @see Blockly.dialog.toast
- */
-export function setToast(
-  toastFunction: (
-    workspace: WorkspaceSvg,
-    options: ToastOptions,
-  ) => void = defaultToast,
-) {
-  toastImplementation = toastFunction;
-}
+export const TEST_ONLY = {
+  confirmInternal,
+};

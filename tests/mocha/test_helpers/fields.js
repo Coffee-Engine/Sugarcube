@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assert} from '../../../node_modules/chai/chai.js';
 import {runTestCases, TestCase} from './common.js';
 
 /**
@@ -75,8 +74,8 @@ export function assertFieldValue(
   if (expectedText === undefined) {
     expectedText = String(expectedValue);
   }
-  assert.deepEqual(actualValue, expectedValue);
-  assert.deepEqual(actualText, expectedText);
+  chai.assert.deepEqual(actualValue, expectedValue);
+  chai.assert.deepEqual(actualText, expectedText);
 }
 
 /**
@@ -120,7 +119,7 @@ function runCreationTestsAssertThrows_(testCases, creation) {
    */
   const createTestFn = (testCase) => {
     return function () {
-      assert.throws(function () {
+      chai.assert.throws(function () {
         creation.call(this, testCase);
       }, testCase.errMsgMatcher);
     };
@@ -162,7 +161,7 @@ export function runConstructorSuiteTests(
       });
     } else {
       test('Empty', function () {
-        assert.throws(function () {
+        chai.assert.throws(function () {
           customCreateWithJs
             ? customCreateWithJs.call(this)
             : new TestedField();
@@ -227,7 +226,7 @@ export function runFromJsonSuiteTests(
       });
     } else {
       test('Empty', function () {
-        assert.throws(function () {
+        chai.assert.throws(function () {
           customCreateWithJson
             ? customCreateWithJson.call(this)
             : TestedField.fromJson({});

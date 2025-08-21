@@ -14,7 +14,7 @@
 import * as registry from '../registry.js';
 import type {Workspace} from '../workspace.js';
 import {Abstract as AbstractEvent} from './events_abstract.js';
-import {EventType} from './type.js';
+import * as eventUtils from './utils.js';
 
 /**
  * Notifies listeners when the workspace has finished deserializing from
@@ -23,7 +23,7 @@ import {EventType} from './type.js';
 export class FinishedLoading extends AbstractEvent {
   override isBlank = true;
   override recordUndo = false;
-  override type = EventType.FINISHED_LOADING;
+  override type = eventUtils.FINISHED_LOADING;
 
   /**
    * @param opt_workspace The workspace that has finished loading.  Undefined
@@ -41,6 +41,6 @@ export class FinishedLoading extends AbstractEvent {
 
 registry.register(
   registry.Type.EVENT,
-  EventType.FINISHED_LOADING,
+  eventUtils.FINISHED_LOADING,
   FinishedLoading,
 );

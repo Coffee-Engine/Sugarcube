@@ -9,18 +9,18 @@
  *
  * @class
  */
-
 // Former goog.module ID: Blockly.Events.Click
 
 import type {Block} from '../block.js';
 import * as registry from '../registry.js';
-import {Workspace} from '../workspace.js';
 import {AbstractEventJson} from './events_abstract.js';
+
 import {UiBase} from './events_ui_base.js';
-import {EventType} from './type.js';
+import * as eventUtils from './utils.js';
+import {Workspace} from '../workspace.js';
 
 /**
- * Notifies listeners that some blockly element was clicked.
+ * Notifies listeners that ome blockly element was clicked.
  */
 export class Click extends UiBase {
   /** The ID of the block that was clicked, if a block was clicked. */
@@ -31,7 +31,7 @@ export class Click extends UiBase {
    * or 'zoom_controls'.
    */
   targetType?: ClickTarget;
-  override type = EventType.CLICK;
+  override type = eventUtils.CLICK;
 
   /**
    * @param opt_block The affected block. Null for click events that do not have
@@ -107,4 +107,4 @@ export interface ClickJson extends AbstractEventJson {
   blockId?: string;
 }
 
-registry.register(registry.Type.EVENT, EventType.CLICK, Click);
+registry.register(registry.Type.EVENT, eventUtils.CLICK, Click);

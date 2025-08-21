@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Former goog.module ID: Blockly.procedures.IProcedureBlock
-
 import type {Block} from '../block.js';
 import {IProcedureModel} from './i_procedure_model.js';
+// Former goog.module ID: Blockly.procedures.IProcedureBlock
 
 /** The interface for a block which models a procedure. */
 export interface IProcedureBlock {
@@ -20,10 +19,9 @@ export interface IProcedureBlock {
 export function isProcedureBlock(
   block: Block | IProcedureBlock,
 ): block is IProcedureBlock {
-  block = block as IProcedureBlock;
   return (
-    typeof block.getProcedureModel === 'function' &&
-    typeof block.doProcedureUpdate === 'function' &&
-    typeof block.isProcedureDef === 'function'
+    (block as IProcedureBlock).getProcedureModel !== undefined &&
+    (block as IProcedureBlock).doProcedureUpdate !== undefined &&
+    (block as IProcedureBlock).isProcedureDef !== undefined
   );
 }

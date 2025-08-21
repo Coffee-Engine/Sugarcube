@@ -106,7 +106,7 @@ Code.getLang = function() {
  * @return {boolean} True if RTL, false if LTR.
  */
 Code.isRtl = function() {
-  return Code.LANGUAGE_RTL.includes(Code.LANG);
+  return Code.LANGUAGE_RTL.indexOf(Code.LANG) !== -1;
 };
 
 /**
@@ -396,7 +396,7 @@ Code.checkAllGeneratorFunctionsDefined = function(generator) {
   for (var i = 0; i < blocks.length; i++) {
     var blockType = blocks[i].type;
     if (!generator.forBlock[blockType]) {
-      if (!missingBlockGenerators.includes(blockType)) {
+      if (missingBlockGenerators.indexOf(blockType) === -1) {
         missingBlockGenerators.push(blockType);
       }
     }
@@ -450,7 +450,7 @@ Code.init = function() {
   // TODO: Clean up the message files so this is done explicitly instead of
   // through this for-loop.
   for (var messageKey in MSG) {
-    if (messageKey.startsWith('cat')) {
+    if (messageKey.indexOf('cat') === 0) {
       Blockly.Msg[messageKey.toUpperCase()] = MSG[messageKey];
     }
   }

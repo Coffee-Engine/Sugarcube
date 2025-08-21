@@ -6,11 +6,11 @@
 
 // Former goog.module ID: Blockly.serialization.workspaces
 
-import {EventType} from '../events/type.js';
 import * as eventUtils from '../events/utils.js';
 import type {ISerializer} from '../interfaces/i_serializer.js';
 import * as registry from '../registry.js';
 import * as dom from '../utils/dom.js';
+// eslint-disable-next-line no-unused-vars
 import type {Workspace} from '../workspace.js';
 import {WorkspaceSvg} from '../workspace_svg.js';
 
@@ -75,7 +75,8 @@ export function load(
   }
 
   // reverse() is destructive, so we have to re-reverse to correct the order.
-  for (const [name, deserializer] of deserializers.reverse()) {
+  for (let [name, deserializer] of deserializers.reverse()) {
+    name = name;
     const pluginState = state[name];
     if (pluginState) {
       (deserializer as ISerializer)?.load(state[name], workspace);
@@ -87,7 +88,7 @@ export function load(
   }
   dom.stopTextWidthCache();
 
-  eventUtils.fire(new (eventUtils.get(EventType.FINISHED_LOADING))(workspace));
+  eventUtils.fire(new (eventUtils.get(eventUtils.FINISHED_LOADING))(workspace));
 
   eventUtils.setGroup(existingGroup);
   eventUtils.setRecordUndo(prevRecordUndo);

@@ -7,17 +7,22 @@
 // Former goog.module ID: Blockly.geras.RenderInfo
 
 import type {BlockSvg} from '../../block_svg.js';
-import {DummyInput} from '../../inputs/dummy_input.js';
-import {EndRowInput} from '../../inputs/end_row_input.js';
 import type {Input} from '../../inputs/input.js';
-import {StatementInput} from '../../inputs/statement_input.js';
-import {ValueInput} from '../../inputs/value_input.js';
 import {RenderInfo as BaseRenderInfo} from '../common/info.js';
 import type {Measurable} from '../measurables/base.js';
+import type {BottomRow} from '../measurables/bottom_row.js';
+import {DummyInput} from '../../inputs/dummy_input.js';
+import {EndRowInput} from '../../inputs/end_row_input.js';
 import {ExternalValueInput} from '../measurables/external_value_input.js';
+import type {Field} from '../measurables/field.js';
 import {InRowSpacer} from '../measurables/in_row_spacer.js';
+import type {InputRow} from '../measurables/input_row.js';
 import type {Row} from '../measurables/row.js';
+import {StatementInput} from '../../inputs/statement_input.js';
+import type {TopRow} from '../measurables/top_row.js';
 import {Types} from '../measurables/types.js';
+import {ValueInput} from '../../inputs/value_input.js';
+
 import type {ConstantProvider} from './constants.js';
 import {InlineInput} from './measurables/inline_input.js';
 import {StatementInput as StatementInputMeasurable} from './measurables/statement_input.js';
@@ -146,7 +151,7 @@ export class RenderInfo extends BaseRenderInfo {
   override getInRowSpacing_(prev: Measurable | null, next: Measurable | null) {
     if (!prev) {
       // Between an editable field and the beginning of the row.
-      if (next && Types.isField(next) && next.isEditable) {
+      if (next && Types.isField(next) && (next as Field).isEditable) {
         return this.constants_.MEDIUM_PADDING;
       }
       // Inline input at the beginning of the row.
@@ -163,10 +168,7 @@ export class RenderInfo extends BaseRenderInfo {
     // Spacing between a non-input and the end of the row or a statement input.
     if (!Types.isInput(prev) && (!next || Types.isStatementInput(next))) {
       // Between an editable field and the end of the row.
-      if (Types.isField(prev) && prev.isEditable) {
-        if (prev.width === 0) {
-          return this.constants_.NO_PADDING;
-        }
+      if (Types.isField(prev) && (prev as Field).isEditable) {
         return this.constants_.MEDIUM_PADDING;
       }
       // Padding at the end of an icon-only row to make the block shape clearer.
@@ -207,7 +209,7 @@ export class RenderInfo extends BaseRenderInfo {
     // Spacing between a non-input and an input.
     if (!Types.isInput(prev) && next && Types.isInput(next)) {
       // Between an editable field and an input.
-      if (Types.isField(prev) && prev.isEditable) {
+      if (Types.isField(prev) && (prev as Field).isEditable) {
         if (Types.isInlineInput(next)) {
           return this.constants_.SMALL_PADDING;
         } else if (Types.isExternalInput(next)) {
@@ -232,7 +234,7 @@ export class RenderInfo extends BaseRenderInfo {
     // Spacing between an inline input and a field.
     if (Types.isInlineInput(prev) && next && Types.isField(next)) {
       // Editable field after inline input.
-      if (next.isEditable) {
+      if ((next as Field).isEditable) {
         return this.constants_.MEDIUM_PADDING;
       } else {
         // Noneditable field after inline input.
@@ -277,11 +279,8 @@ export class RenderInfo extends BaseRenderInfo {
       Types.isField(prev) &&
       next &&
       Types.isField(next) &&
-      prev.isEditable === next.isEditable
+      (prev as Field).isEditable === (next as Field).isEditable
     ) {
-      if (prev.width === 0) {
-        return this.constants_.NO_PADDING;
-      }
       return this.constants_.LARGE_PADDING;
     }
 
@@ -325,17 +324,20 @@ export class RenderInfo extends BaseRenderInfo {
       return row.yPos + elem.height / 2;
     }
     if (Types.isBottomRow(row)) {
-      const baseline = row.yPos + row.height - row.descenderHeight;
+      const bottomRow = row as BottomRow;
+      const baseline =
+        bottomRow.yPos + bottomRow.height - bottomRow.descenderHeight;
       if (Types.isNextConnection(elem)) {
         return baseline + elem.height / 2;
       }
       return baseline - elem.height / 2;
     }
     if (Types.isTopRow(row)) {
+      const topRow = row as TopRow;
       if (Types.isHat(elem)) {
-        return row.capline - elem.height / 2;
+        return topRow.capline - elem.height / 2;
       }
-      return row.capline + elem.height / 2;
+      return topRow.capline + elem.height / 2;
     }
 
     let result = row.yPos;
@@ -369,7 +371,7 @@ export class RenderInfo extends BaseRenderInfo {
       rowNextRightEdges.set(row, nextRightEdge);
       if (Types.isInputRow(row)) {
         if (row.hasStatement) {
-          this.alignStatementRow_(row);
+          this.alignStatementRow_(row as InputRow);
         }
         if (
           prevInput &&

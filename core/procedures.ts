@@ -15,39 +15,29 @@ import {Blocks} from './blocks.js';
 import * as common from './common.js';
 import type {Abstract} from './events/events_abstract.js';
 import type {BubbleOpen} from './events/events_bubble_open.js';
-import {
-  isBlockChange,
-  isBlockCreate,
-  isBlockDelete,
-  isBlockFieldIntermediateChange,
-  isBubbleOpen,
-} from './events/predicates.js';
-import {EventType} from './events/type.js';
 import * as eventUtils from './events/utils.js';
 import {Field, UnattachedFieldError} from './field.js';
-import {MutatorIcon} from './icons.js';
+import {Msg} from './msg.js';
+import {Names} from './names.js';
+import {IParameterModel} from './interfaces/i_parameter_model.js';
+import {IProcedureMap} from './interfaces/i_procedure_map.js';
+import {IProcedureModel} from './interfaces/i_procedure_model.js';
+import {
+  IProcedureBlock,
+  isProcedureBlock,
+} from './interfaces/i_procedure_block.js';
 import {
   isLegacyProcedureCallBlock,
   isLegacyProcedureDefBlock,
   ProcedureBlock,
   ProcedureTuple,
 } from './interfaces/i_legacy_procedure_blocks.js';
-import {IParameterModel} from './interfaces/i_parameter_model.js';
-import {
-  IProcedureBlock,
-  isProcedureBlock,
-} from './interfaces/i_procedure_block.js';
-import {IProcedureMap} from './interfaces/i_procedure_map.js';
-import {IProcedureModel} from './interfaces/i_procedure_model.js';
-import {Msg} from './msg.js';
-import {Names} from './names.js';
 import {ObservableProcedureMap} from './observable_procedure_map.js';
-import * as deprecation from './utils/deprecation.js';
-import type {FlyoutItemInfo} from './utils/toolbox.js';
 import * as utilsXml from './utils/xml.js';
 import * as Variables from './variables.js';
 import type {Workspace} from './workspace.js';
 import type {WorkspaceSvg} from './workspace_svg.js';
+import {MutatorIcon} from './icons.js';
 
 /**
  * String for use in the "custom" attribute of a category in toolbox XML.
@@ -240,7 +230,7 @@ export function rename(this: Field, name: string): string {
  * @param workspace The workspace containing procedures.
  * @returns Array of XML block elements.
  */
-function xmlFlyoutCategory(workspace: WorkspaceSvg): Element[] {
+export function flyoutCategory(workspace: WorkspaceSvg): Element[] {
   const xmlList = [];
   if (Blocks['procedures_defnoreturn']) {
     // <block type="procedures_defnoreturn" gap="16">
@@ -325,109 +315,6 @@ function xmlFlyoutCategory(workspace: WorkspaceSvg): Element[] {
 }
 
 /**
- * Internal wrapper that returns the contents of the procedure category.
- *
- * @internal
- * @param workspace The workspace to populate procedure blocks for.
- */
-export function internalFlyoutCategory(
-  workspace: WorkspaceSvg,
-): FlyoutItemInfo[] {
-  return flyoutCategory(workspace, false);
-}
-
-export function flyoutCategory(
-  workspace: WorkspaceSvg,
-  useXml: true,
-): Element[];
-export function flyoutCategory(
-  workspace: WorkspaceSvg,
-  useXml: false,
-): FlyoutItemInfo[];
-/**
- * Construct the blocks required by the flyout for the procedure category.
- *
- * @param workspace The workspace containing procedures.
- * @param useXml True to return the contents as XML, false to use JSON.
- * @returns List of flyout contents as either XML or JSON.
- */
-export function flyoutCategory(
-  workspace: WorkspaceSvg,
-  useXml = true,
-): Element[] | FlyoutItemInfo[] {
-  if (useXml) {
-    deprecation.warn(
-      'The XML return value of Blockly.Procedures.flyoutCategory()',
-      'v12',
-      'v13',
-      'the same method, but handle a return type of FlyoutItemInfo[] (JSON) instead.',
-    );
-    return xmlFlyoutCategory(workspace);
-  }
-  const blocks = [];
-  if (Blocks['procedures_defnoreturn']) {
-    blocks.push({
-      'kind': 'block',
-      'type': 'procedures_defnoreturn',
-      'gap': 16,
-      'fields': {
-        'NAME': Msg['PROCEDURES_DEFNORETURN_PROCEDURE'],
-      },
-    });
-  }
-  if (Blocks['procedures_defreturn']) {
-    blocks.push({
-      'kind': 'block',
-      'type': 'procedures_defreturn',
-      'gap': 16,
-      'fields': {
-        'NAME': Msg['PROCEDURES_DEFRETURN_PROCEDURE'],
-      },
-    });
-  }
-  if (Blocks['procedures_ifreturn']) {
-    blocks.push({
-      'kind': 'block',
-      'type': 'procedures_ifreturn',
-      'gap': 16,
-    });
-  }
-  if (blocks.length) {
-    // Add slightly larger gap between system blocks and user calls.
-    blocks[blocks.length - 1]['gap'] = 24;
-  }
-
-  /**
-   * Creates JSON block definitions for each of the given procedures.
-   *
-   * @param procedureList A list of procedures, each of which is defined by a
-   *     three-element list of name, parameter list, and return value boolean.
-   * @param templateName The type of the block to generate.
-   */
-  function populateProcedures(
-    procedureList: ProcedureTuple[],
-    templateName: string,
-  ) {
-    for (const [name, args] of procedureList) {
-      blocks.push({
-        'kind': 'block',
-        'type': templateName,
-        'gap': 16,
-        'extraState': {
-          'name': name,
-          'params': args,
-        },
-      });
-    }
-  }
-
-  const tuple = allProcedures(workspace);
-  populateProcedures(tuple[0], 'procedures_callnoreturn');
-  populateProcedures(tuple[1], 'procedures_callreturn');
-  return blocks;
-}
-
-/**
  * Updates the procedure mutator's flyout so that the arg block is not a
  * duplicate of another arg.
  *
@@ -467,8 +354,9 @@ function updateMutatorFlyout(workspace: WorkspaceSvg) {
  * @internal
  */
 export function mutatorOpenListener(e: Abstract) {
-  if (!isBubbleOpen(e)) return;
-
+  if (e.type !== eventUtils.BUBBLE_OPEN) {
+    return;
+  }
   const bubbleEvent = e as BubbleOpen;
   if (
     !(bubbleEvent.bubbleType === 'mutator' && bubbleEvent.isOpen) ||
@@ -498,10 +386,10 @@ export function mutatorOpenListener(e: Abstract) {
  */
 function mutatorChangeListener(e: Abstract) {
   if (
-    !isBlockCreate(e) &&
-    !isBlockDelete(e) &&
-    !isBlockChange(e) &&
-    !isBlockFieldIntermediateChange(e)
+    e.type !== eventUtils.BLOCK_CREATE &&
+    e.type !== eventUtils.BLOCK_DELETE &&
+    e.type !== eventUtils.BLOCK_CHANGE &&
+    e.type !== eventUtils.BLOCK_FIELD_INTERMEDIATE_CHANGE
   ) {
     return;
   }
@@ -566,7 +454,7 @@ export function mutateCallers(defBlock: Block) {
       // definition mutation.
       eventUtils.setRecordUndo(false);
       eventUtils.fire(
-        new (eventUtils.get(EventType.BLOCK_CHANGE))(
+        new (eventUtils.get(eventUtils.BLOCK_CHANGE))(
           caller,
           'mutation',
           null,
@@ -612,11 +500,11 @@ export function getDefinition(
 }
 
 export {
+  ObservableProcedureMap,
   IParameterModel,
   IProcedureBlock,
+  isProcedureBlock,
   IProcedureMap,
   IProcedureModel,
-  isProcedureBlock,
-  ObservableProcedureMap,
   ProcedureTuple,
 };
