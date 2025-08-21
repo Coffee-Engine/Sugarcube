@@ -872,7 +872,7 @@ export class ConstantProvider extends BaseConstantProvider {
 
       // Dropdown field.
       `${selector} .blocklyDropdownText {`,
-      `fill: #fff !important;`,
+      `fill: #fff;`,
       `}`,
 
       // Widget and Dropdown Div

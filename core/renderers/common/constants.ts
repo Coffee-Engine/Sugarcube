@@ -657,6 +657,13 @@ export class ConstantProvider {
     valid.colourTertiary = valid['colourTertiary']
       ? parsing.parseBlockColour(valid['colourTertiary']).hex
       : this.generateTertiaryColour_(valid.colourPrimary);
+    valid.colourQuaternary = valid['colourQuaternary']
+      ? parsing.parseBlockColour(valid['colourQuaternary']).hex
+      : this.generateTertiaryColour_(valid.colourPrimary);
+    valid.colourQuinary = parsedColour.hex;
+    valid.useBlackWhiteFields = valid['useBlackWhiteFields']
+      ? valid['useBlackWhiteFields']
+      : false;
 
     valid.hat = valid['hat'] || '';
     return valid;

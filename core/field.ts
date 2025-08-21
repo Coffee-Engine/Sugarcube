@@ -43,6 +43,7 @@ import * as userAgent from './utils/useragent.js';
 import * as utilsXml from './utils/xml.js';
 import * as WidgetDiv from './widgetdiv.js';
 import {WorkspaceSvg} from './workspace_svg.js';
+import { BlockStyle } from './theme.js';
 
 /**
  * A function that is called to validate changes to the field's value before
@@ -764,8 +765,32 @@ export abstract class Field<T = any>
    * https://developers.google.com/blockly/guides/create-custom-blocks/fields/customizing-fields/creating#matching_block_colours
    * | the field documentation} for more information, or FieldDropdown for an
    * example.
+   * 
+   * We are going to provide code in here that actually will allow for the field to inherit styles.
    */
-  applyColour() {}
+  applyColour() {
+    //Check for source block's existance
+    if (!this.sourceBlock_) return;
+
+    //Then get our parent block, style block and possibly parent of parent block.
+    const sourceBlock : BlockSvg | null = this.getSourceBlock() as BlockSvg;
+    if (!sourceBlock) return;
+
+    const styleName : string = sourceBlock.getStyleName();
+
+    //Make sure we fall back on source block always
+    const parentBlock : BlockSvg = ((styleName) ? sourceBlock : ((sourceBlock.getParent()) ? sourceBlock.getParent() : sourceBlock)) as BlockSvg;
+
+    if (parentBlock) {
+      const parentStyle : BlockStyle = parentBlock.getStyle();
+      if (this.borderRect_) this.borderRect_.style.fill = (parentStyle.useBlackWhiteFields) ? "#ffffff" : (parentStyle.colourQuinary || "#ffffff");
+
+      if (this.textElement_) {
+        if (styleName) this.textElement_.style.fill = sourceBlock.getStyle().colourQuaternary;
+        else this.textElement_.style.fill = (sourceBlock.isShadow() && parentStyle.useBlackWhiteFields) ? "#000000" : parentStyle.colourQuaternary;
+      }
+    }
+  }
 
   /**
    * Used by getSize() to move/resize any DOM elements, and get the new size.

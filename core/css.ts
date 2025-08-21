@@ -368,7 +368,7 @@ input[type=number] {
 
 .blocklyDropdownMenu {
   border-radius: 2px;
-  padding: 0 !important;
+  padding: 0;
 }
 
 .blocklyDropdownMenu .blocklyMenuItem {
@@ -476,7 +476,7 @@ input[type=number] {
   left: 0;
   right: 0;
   bottom: 0;
-  overflow: visible !important;
+  overflow: visible;
   z-index: 80;
   pointer-events: none;
 }

@@ -480,7 +480,7 @@ export class Menu {
    *
    * @returns The MenuItem objects displayed in this menu.
    */
-  private getMenuItems(): MenuItem[] {
+  getMenuItems(): MenuItem[] {
     return this.menuItems.filter((item) => item instanceof MenuItem);
   }
 }
