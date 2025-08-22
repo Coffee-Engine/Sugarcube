@@ -475,7 +475,7 @@ export class FieldDropdown extends Field<string> {
       }
     }
 
-    super.applyColour();
+    if (this.textElement_) this.textElement_.style.fill = (style.colourQuaternary || "#ffffff");
   }
 
   /** Draws the border with the correct width. */

@@ -1179,6 +1179,7 @@ export class BlockSvg
   }
   
   getStyle() {
+    if (!this.styleName_) return;
     return this.workspace
       .getRenderer()
       .getConstants()

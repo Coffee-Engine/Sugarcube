@@ -766,10 +766,13 @@ export abstract class Field<T = any>
 
     if (parentBlock) {
       const parentStyle = parentBlock.getStyle();
+      if (!parentStyle) return;
       if (this.borderRect_) this.borderRect_.style.fill = (parentStyle.useBlackWhiteFields) ? "#ffffff" : (parentStyle.colourQuinary || "#ffffff");
 
+      
       if (this.textElement_) {
-        if (styleName) this.textElement_.style.fill = sourceBlock.getStyle().colourQuaternary;
+        var sourceStyle = sourceBlock.getStyle();
+        if (styleName) this.textElement_.style.fill = (sourceStyle && ! this.borderRect_) ? sourceStyle.colourQuaternary: "#000000";
         else this.textElement_.style.fill = (sourceBlock.isShadow() && parentStyle.useBlackWhiteFields) ? "#000000" : parentStyle.colourQuaternary;
       }
     }

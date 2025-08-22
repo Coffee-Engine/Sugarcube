@@ -313,12 +313,14 @@ export class Drawer {
       }
     } else {
       const svgGroup = (fieldInfo as Field).field.getSvgRoot()!;
-      svgGroup.setAttribute(
-        'transform',
-        'translate(' + xPos + ',' + yPos + ')' + scale,
-      );
-      if (this.info_.isInsertionMarker) {
-        svgGroup.setAttribute('display', 'none');
+      if (svgGroup) {
+        svgGroup.setAttribute(
+          'transform',
+          'translate(' + xPos + ',' + yPos + ')' + scale,
+        );
+        if (this.info_.isInsertionMarker) {
+          svgGroup.setAttribute('display', 'none');
+        }
       }
     }
   }

@@ -197,13 +197,13 @@ export class PathObject implements IPathObject {
    * @param disabled True if disabled.
    */
   protected updateDisabled_(disabled: boolean) {
-    this.setClass_('blocklyDisabled', disabled);
+    /*this.setClass_('blocklyDisabled', disabled);
     if (disabled) {
       this.svgPath.setAttribute(
         'fill',
         'url(#' + this.constants.disabledPatternId + ')',
       );
-    }
+    }*/
   }
 
   /**

@@ -227,6 +227,30 @@ export abstract class FieldInput<T extends InputTypes> extends Field<
         this.getConstants()!.FIELD_BORDER_RECT_COLOUR,
       );
     }
+
+    //Check for source block's existance
+    if (!this.sourceBlock_) return;
+
+    //Then get our parent block, style block and possibly parent of parent block.
+    const sourceBlock : BlockSvg | null = this.getSourceBlock() as BlockSvg;
+    if (!sourceBlock) return;
+
+    const styleName : string = sourceBlock.getStyleName();
+
+    //Make sure we fall back on source block always
+    const parentBlock : BlockSvg = ((styleName) ? sourceBlock : ((sourceBlock.getParent()) ? sourceBlock.getParent() : sourceBlock)) as BlockSvg;
+
+    if (parentBlock) {
+      const parentStyle = parentBlock.getStyle();
+      if (!parentStyle) return;
+      if (this.borderRect_) this.borderRect_.style.fill = (parentStyle.useBlackWhiteFields) ? "#ffffff" : (parentStyle.colourQuinary || "#ffffff");
+      
+      if (this.textElement_) {
+        var sourceStyle = sourceBlock.getStyle();
+        if (styleName) this.textElement_.style.fill = (sourceStyle && ! this.borderRect_) ? sourceStyle.colourQuaternary: "#000000";
+        else this.textElement_.style.fill = (sourceBlock.isShadow() && parentStyle.useBlackWhiteFields) ? "#000000" : parentStyle.colourQuaternary;
+      }
+    }
   }
 
   /**

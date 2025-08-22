@@ -614,7 +614,11 @@ export class ConstantProvider {
    * @returns The named block style, or a default style if no style with the
    *     given name was found.
    */
-  getBlockStyle(blockStyleName: string | null): BlockStyle {
+  getBlockStyle(blockStyleName: string | object | null): BlockStyle {
+    if (!blockStyleName) blockStyleName = "";
+
+    //Stuff
+    if (typeof blockStyleName == "object") return this.validatedBlockStyle_(blockStyleName);
     return (
       this.blockStyles[blockStyleName || ''] ||
       (blockStyleName && blockStyleName.indexOf('auto_') === 0
@@ -660,7 +664,9 @@ export class ConstantProvider {
     valid.colourQuaternary = valid['colourQuaternary']
       ? parsing.parseBlockColour(valid['colourQuaternary']).hex
       : this.generateTertiaryColour_(valid.colourPrimary);
-    valid.colourQuinary = parsedColour.hex;
+    valid.colourQuinary = valid['colourQuinary']
+      ? parsing.parseBlockColour(valid['colourQuinary']).hex
+      : this.generateTertiaryColour_(valid.colourPrimary);
     valid.useBlackWhiteFields = valid['useBlackWhiteFields']
       ? valid['useBlackWhiteFields']
       : false;
