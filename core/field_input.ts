@@ -243,7 +243,7 @@ export abstract class FieldInput<T extends InputTypes> extends Field<
     if (parentBlock) {
       const parentStyle = parentBlock.getStyle();
       if (!parentStyle) return;
-      if (this.borderRect_) this.borderRect_.style.fill = (parentStyle.useBlackWhiteFields) ? "#ffffff" : (parentStyle.colourQuinary || "#ffffff");
+      if (this.borderRect_) block.pathObject.svgPath.setAttribute('fill',(parentStyle.useBlackWhiteFields) ? "#ffffff" : (parentStyle.colourQuinary || "#ffffff"));
       
       if (this.textElement_) {
         var sourceStyle = sourceBlock.getStyle();
