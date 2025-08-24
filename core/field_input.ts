@@ -238,12 +238,14 @@ export abstract class FieldInput<T extends InputTypes> extends Field<
     const styleName : string = sourceBlock.getStyleName();
 
     //Make sure we fall back on source block always
-    const parentBlock : BlockSvg = ((styleName) ? sourceBlock : ((sourceBlock.getParent()) ? sourceBlock.getParent() : sourceBlock)) as BlockSvg;
+    const parentBlock : BlockSvg = ((!sourceBlock.getParent()) ? sourceBlock : ((sourceBlock.getParent()) ? sourceBlock.getParent() : sourceBlock)) as BlockSvg;
 
     if (parentBlock) {
       const parentStyle = parentBlock.getStyle();
       if (!parentStyle) return;
-      if (this.borderRect_) block.pathObject.svgPath.setAttribute('fill',(parentStyle.useBlackWhiteFields) ? "#ffffff" : (parentStyle.colourQuinary || "#ffffff"));
+      if (this.borderRect_)  {
+        block.pathObject.svgPath.setAttribute('fill',(parentStyle.useBlackWhiteFields) ? "#ffffff" : (parentStyle.colourQuinary || "#ffffff"));
+      }
       
       if (this.textElement_) {
         var sourceStyle = sourceBlock.getStyle();
