@@ -772,8 +772,8 @@ export abstract class Field<T = any>
       
       if (this.textElement_) {
         var sourceStyle = sourceBlock.getStyle();
-        if (styleName) this.textElement_.style.fill = (sourceStyle && ! this.borderRect_) ? sourceStyle.colourQuaternary: "#000000";
-        else this.textElement_.style.fill = (sourceBlock.isShadow() && parentStyle.useBlackWhiteFields) ? "#000000" : parentStyle.colourQuaternary;
+        if (styleName) this.textElement_.style.fill = (sourceStyle) ? sourceStyle.colourQuaternary: "#000000";
+        if (!sourceStyle) this.textElement_.style.fill = (sourceBlock.isShadow() && parentStyle.useBlackWhiteFields) ? "#000000" : parentStyle.colourQuaternary;
       }
     }
   }
